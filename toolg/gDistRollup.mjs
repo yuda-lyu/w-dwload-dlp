@@ -19,12 +19,18 @@ rollupFiles({
         'fs': 'fs',
         'process': 'process',
         'child_process': 'child_process',
+        'archiver': 'archiver',
+        'archiver-zip-encrypted': 'archiver-zip-encrypted',
+        'unzipper': 'unzipper',
     },
     external: [
         'path',
         'fs',
         'process',
         'child_process',
+        'archiver',
+        'archiver-zip-encrypted',
+        'unzipper',
     ],
 })
 
