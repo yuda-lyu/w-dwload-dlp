@@ -1,22 +1,28 @@
 import path from 'path'
-// import fs from 'fs'
+import fs from 'fs'
 import process from 'process'
 import get from 'lodash-es/get.js'
+import size from 'lodash-es/size.js'
 import genID from 'wsemi/src/genID.mjs'
 import now2strp from 'wsemi/src/now2strp.mjs'
 import sep from 'wsemi/src/sep.mjs'
 import strright from 'wsemi/src/strright.mjs'
 import strdelright from 'wsemi/src/strdelright.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
+import genPm from 'wsemi/src/genPm.mjs'
 import execProcess from 'wsemi/src/execProcess.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
+import fsRenameFile from 'wsemi/src/fsRenameFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
+import fsDeleteFolder from 'wsemi/src/fsDeleteFolder.mjs'
+import mZip from 'w-zip/src/mZip.mjs'
 
 
 let fdSrv = path.resolve()
@@ -24,6 +30,47 @@ let fdSrv = path.resolve()
 
 function isWindows() {
     return process.platform === 'win32'
+}
+
+
+function fsMergeFiles(files, target) {
+
+    //check
+    if (!isearr(files) && !isestr(files)) {
+        throw new Error(`files[${files}] is not an effective string or array`)
+    }
+    if (!isearr(files)) {
+        files = [files]
+    }
+
+    //pm
+    let pm = genPm()
+
+    //writeable
+    let writeable = fs.createWriteStream(target)
+
+    //core
+    let core = () => {
+        if (size(files) === 0) {
+            writeable.end()
+            pm.resolve()
+        }
+        else {
+            let readable = fs.createReadStream(files.shift())
+            readable.pipe(writeable, { end: false })
+            readable.on('end', () => {
+                core()
+            })
+            readable.on('error', (err) => {
+                pm.reject(err)
+            })
+        }
+    }
+
+    //core
+    core()
+
+    return pm
 }
 
 
@@ -78,6 +125,7 @@ function isWindows() {
  */
 async function WDwloadDlp(url, fp, opt = {}) {
     let errTemp = null
+    let rc
 
     //clean
     let clean = get(opt, 'clean')
@@ -107,10 +155,51 @@ async function WDwloadDlp(url, fp, opt = {}) {
         fdExe = fdExeDist
     }
 
-    //exeDl
-    let exeDl = path.resolve(fdExe, 'yt-dlp.exe')
-    exeDl = `"${exeDl}"` //用雙引號包住避免路徑有空格
-    // console.log('exeDl', exeDl)
+    //exeDlp
+    let exeDlp = path.resolve(fdExe, 'yt-dlp.exe')
+    exeDlp = `"${exeDlp}"` //用雙引號包住避免路徑有空格
+    // console.log('exeDlp', exeDlp)
+
+    //exeFfmpeg
+    let exeFfmpeg = path.resolve(fdExe, 'ffmpeg.exe')
+    // console.log('exeFfmpeg', exeFfmpeg)
+
+    //check ffmpeg, 若ffmpeg不存在則由分拆zip檔解壓縮出來用
+    if (!fsIsFile(exeFfmpeg)) {
+
+        //zipFfmpeg
+        let zipFfmpeg = path.resolve(fdExe, 'ffmpeg.zip')
+
+        //fsMergeFiles to ffmpeg.zip
+        let fp1 = path.resolve(fdExe, 'ffmpeg.zip.001')
+        let fp2 = path.resolve(fdExe, 'ffmpeg.zip.002')
+        let fp3 = path.resolve(fdExe, 'ffmpeg.zip.003')
+        let fp4 = path.resolve(fdExe, 'ffmpeg.zip.004')
+        let fp5 = path.resolve(fdExe, 'ffmpeg.zip.005')
+        await fsMergeFiles([fp1, fp2, fp3, fp4, fp5], zipFfmpeg)
+
+        //unzip
+        let fdFfmpeg = path.resolve(fdExe, 'temp')
+        if (true) {
+            await mZip.unzip(zipFfmpeg, fdFfmpeg)
+            // console.log('mZip.unzip', r)
+        }
+
+        //fsRenameFile ffmpeg.exe
+        if (true) {
+            let exeFfmpegTemp = path.resolve(`${fdFfmpeg}/`, 'ffmpeg.exe')
+            // console.log('exeFfmpegTemp', exeFfmpegTemp)
+            fsRenameFile(exeFfmpegTemp, exeFfmpeg)
+            // console.log('fsRenameFile', r)
+        }
+
+        //fsDeleteFile ffmpeg.zip
+        fsDeleteFile(zipFfmpeg)
+
+        //fsDeleteFolder temp
+        fsDeleteFolder(fdFfmpeg)
+
+    }
 
     //cwdOri, cwdTar
     let cwdOri = process.cwd()
@@ -234,7 +323,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
     // console.log('cmdDl', cmdDl)
 
     //execProcess
-    await execProcess(exeDl, cmdDl, { cbStdout })
+    await execProcess(exeDlp, cmdDl, { cbStdout })
         // .then(function(res) {
         //     console.log('execProcess then', res)
         // })
@@ -310,8 +399,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
     //fpOut
     let fpOut = fp
     // console.log('fpOut', fpOut)
-
-    let rc
 
     //fsCopyFile
     rc = fsCopyFile(fpInMp4, fpOut)
