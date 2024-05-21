@@ -1,0 +1,32 @@
+{
+  "name": "w-dwload-dlp",
+  "version": "1.0.2",
+  "main": "dist/w-dwload-dlp.umd.js",
+  "dependencies": {
+    "lodash-es": "^4.17.21",
+    "wsemi": "^1.7.50"
+  },
+  "devDependencies": {
+    "w-package-tools": "^1.0.75"
+  },
+  "scripts": {
+    "test": "mocha --parallel --timeout 60000 --experimental-modules",
+    "deploy": "gh-pages -d docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuda-lyu/w-dwload-dlp.git"
+  },
+  "keywords": [
+    "package",
+    "tool",
+    "video",
+    "yt-dlp",
+    "youtube",
+    "bilibili",
+    "windows",
+    "nodejs"
+  ],
+  "author": "yuda-lyu(semisphere)",
+  "license": "MIT"
+}
