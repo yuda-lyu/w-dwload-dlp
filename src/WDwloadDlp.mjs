@@ -3,6 +3,7 @@ import fs from 'fs'
 import process from 'process'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
+import each from 'lodash-es/each.js'
 import genID from 'wsemi/src/genID.mjs'
 import now2strp from 'wsemi/src/now2strp.mjs'
 import sep from 'wsemi/src/sep.mjs'
@@ -11,7 +12,9 @@ import strdelright from 'wsemi/src/strdelright.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
+import cint from 'wsemi/src/cint.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import execProcess from 'wsemi/src/execProcess.mjs'
@@ -99,8 +102,8 @@ function fsMergeFiles(files, target) {
  *     let fp = './test.mp4'
  *
  *     //funProg
- *     let funProg = (prog, nn, na) => {
- *         console.log('prog', `${prog.toFixed(2)}%`, nn, na)
+ *     let funProg = (prog, nn, nat) => {
+ *         console.log('prog', `${prog.toFixed(2)}%`, nn, nat)
  *     }
  *
  *     //WDwloadDlp
@@ -233,49 +236,101 @@ async function WDwloadDlp(url, fp, opt = {}) {
     let fpInMp4 = path.resolve(fdDownloads, `${id}.mp4`)
     // console.log('fpInMp4', fpInMp4)
 
-    let bdl = false
+    let fmts = []
+    // let mode = 'mp4' //default
+    let dn = 0 //default
+    let da = 1 //default
+    // let bdl = false
     let nnPre = 0
     let nn = 0
-    let na = 0
+    let na = 100 //default
+    let naf = 0
     let prog = 0
     let bFunProg = isfun(funProg)
     let cbStdout = (msg) => {
         // console.log('cbStdout', msg)
+        msg = msg.replaceAll('\n', ' ') //可能多訊息合併觸發, 去除換行符號不分列處理, 並只偵測處理前面(第1條)
+        // console.log('cbStdout', `*${msg}*`)
 
         //s
         let s = sep(msg, ' ')
         // console.log('s', s)
 
+        //fmts
+        if (msg.indexOf('format(s):') >= 0) {
+            let ss = sep(msg, 'format(s):')
+            let ss1 = get(ss, 1, '')
+            fmts = sep(ss1, '+')
+            // console.log('fmts', fmts)
+            da = size(fmts)
+        }
+
+        //自動更新fmts, 並將size(fmts)視為階段數
+        if (size(fmts) > 0) {
+            let _kfmt = -1
+            // let _fmt = ''
+            each(fmts, (fmt, kfmt) => {
+                if (msg.indexOf(`.f${fmt}.`) >= 0) {
+                    _kfmt = kfmt
+                    // _fmt = fmt
+                }
+            })
+            let _dn = _kfmt + 1
+            if (dn < _dn) {
+                dn = _dn
+                // console.log('_kfmt', _kfmt, '_fmt', _fmt)
+                // console.log('dn', dn, 'da', da)
+            }
+        }
+
+        //自動更新na
+        if (naf === 0 && msg.indexOf('(frag') >= 0) {
+            //(frag 82/99)
+            let ss = sep(msg, '(frag')
+            let ss1 = get(ss, 1, '')
+            ss1 = ss1.replaceAll(')', '')
+            let nnna = sep(ss1, '/')
+            let _na = get(nnna, 1, '')
+            if (isnum(_na)) {
+                _na = cint(_na)
+                if (_na > 0) {
+                    naf = _na
+                    // console.log('naf', naf)
+                }
+            }
+        }
+
         //s1
         let s1 = get(s, 1, '')
 
         //bp
-        let bp = strright(s1, 1) === '%'
-
-        //check
-        if (!bp) {
-            return
-        }
+        let bp1 = strright(s1, 1) === '%'
+        let bp2 = msg.indexOf('(frag 0/') >= 0 //第1個可能是下載清單瞬間會100%, 直接忽略不考慮
+        let bp = bp1 && !bp2
 
         //prog
-        let _prog = strdelright(s1, 1)
-        _prog = cdbl(_prog)
-        // console.log('_prog(ori)', _prog)
-
-        //bdl
-        if (!bdl && _prog === 100) {
-            bdl = true
-            return //當第1次達100%先跳出, 不處理之後檔案下載進度
+        let _prog = 0
+        if (bp) {
+            _prog = strdelright(s1, 1)
+            _prog = cdbl(_prog)
+            // console.log('_prog(ori)', _prog)
         }
-        // console.log('bdl', bdl)
 
-        //check, 若bdl=false, 代表尚未完成下載清單100%, 不處理之後檔案下載進度
-        if (!bdl) {
-            return
+        //依照階段重算_prog
+        if (_prog > 0) {
+
+            //rDif, rPre
+            let rDif = 1 / da
+            let pPre = ((dn - 1) / da) * 100
+
+            //計算分階段值
+            _prog = rDif * _prog + pPre
+            // console.log('_prog(stage)', _prog)
+
         }
-        // console.log('eff. download')
 
-        _prog *= 0.99 //最高99%, 因可能還有轉檔(例如webm轉mp4), 故最後100%改由最後完成階段觸發
+        //最高99%, 因可能還有轉檔(例如webm轉mp4), 故最後100%改由最後完成階段觸發
+        _prog *= 0.99
         // console.log('_prog(99%)', _prog)
 
         //update
@@ -285,31 +340,23 @@ async function WDwloadDlp(url, fp, opt = {}) {
         else {
             return
         }
-        // console.log('prog', prog)
+        // console.log('prog(now)', prog)
 
-        //nna
-        let s10 = get(s, 10)
-        s10 = strdelright(s10, 1)
-        let nna = sep(s10, '/')
-
-        //nn
-        nn = get(nna, 0, '')
-        nn = cdbl(nn)
-        // console.log('nn', nn)
+        //update nn
+        if (naf > 0) {
+            na = naf
+        }
+        nn = cint(prog / 100 * na)
+        // console.log('nn', nn, 'nat', nat)
 
         //check, 若nn沒有>nnPre則視為不需要觸發funProg, 減少切太細導致高頻觸發
         if (nn <= nnPre) {
             return
         }
 
-        //na
-        na = get(nna, 1, '')
-        na = cdbl(na)
-        // console.log('na', na)
-
         //call
         if (bFunProg) {
-            // console.log('prog', nn, na, prog)
+            // console.log('prog', nn, nat, prog)
             funProg(prog, nn, na)
         }
 
@@ -339,10 +386,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
         funProg(prog, na, na) //因是強制100%, 故nn要直接給na
     }
 
-
-    // //clearInterval
-    // clearInterval(t)
-
     //chdir, 不論正常或錯誤皆需還原工作路徑
     process.chdir(cwdOri)
 
@@ -350,44 +393,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
     if (isestr(errTemp)) {
         return Promise.reject(errTemp)
     }
-
-    // //check, 若因m3u8內method給NONE無法被N_m3u8DL-CLI識別處理, 故會採取僅合併ts不轉檔方式產生ts
-    // if (!fsIsFile(fpInAny) && fsIsFile(fpInTs)) {
-
-    //     //cmdFfmpeg
-    //     let cmdFfmpeg = `-i "${fpInTs}" -vcodec copy -acodec copy "${fpInAny}"`
-    //     // console.log('cmdFfmpeg', cmdFfmpeg)
-
-    //     //execProcess
-    //     await execProcess(exeFfmpeg, cmdFfmpeg)
-    //         // .then(function(res) {
-    //         //     console.log('execProcess then', res)
-    //         // })
-    //         .catch(() => {
-    //             //console.log('execProcess catch', err)
-    //             //特殊偵測處理, 不再提供報錯訊尋
-    //         })
-
-    // }
-
-    // //check, 若下載檔案為webm, 則再轉為mp4
-    // if (fsIsFile(fpInWebm) && !fsIsFile(fpInMp4)) {
-
-    //     //cmdFfmpeg
-    //     let cmdFfmpeg = `-i -k "${fpInWebm}" "${fpInMp4}"`
-    //     // console.log('cmdFfmpeg', cmdFfmpeg)
-
-    //     //execProcess
-    //     await execProcess(exeFfmpeg, cmdFfmpeg)
-    //         .then(function(res) {
-    //             console.log('execProcess then', res)
-    //         })
-    //         .catch((err) => {
-    //             console.log('execProcess catch', err)
-    //             //特殊偵測處理, 不再提供報錯訊尋
-    //         })
-
-    // }
 
     //check
     if (!fsIsFile(fpInMp4)) {
@@ -410,35 +415,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
     //fsDeleteFile
     rc = fsDeleteFile(fpInMp4)
     //可能無檔案無法刪, 故不檢查錯誤
-
-    // //fsDeleteFile
-    // rc = fsDeleteFile(fpInWebm)
-    // //可能無檔案無法刪, 故不檢查錯誤
-
-    // //fsDeleteFile
-    // rc = fsDeleteFile(fpInMp4)
-    // errTemp = get(rc, 'error')
-    // if (errTemp) {
-    //     return Promise.reject(errTemp.toString())
-    // }
-
-    // //fsDeleteFile
-    // rc = fsDeleteFile(fpInTs)
-    // //可能無檔案無法刪, 故不檢查錯誤
-
-    // //fsDeleteFolder
-    // rc = fsDeleteFolder(fdDownloadsId)
-    // errTemp = get(rc, 'error')
-    // if (errTemp) {
-    //     return Promise.reject(errTemp.toString())
-    // }
-
-    // //fsCleanFolder
-    // rc = fsCleanFolder(fdLogs)
-    // errTemp = get(rc, 'error')
-    // if (errTemp) {
-    //     return Promise.reject(errTemp.toString())
-    // }
 
     return 'ok'
 }
