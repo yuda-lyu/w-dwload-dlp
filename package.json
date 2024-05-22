@@ -1,6 +1,6 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
     "lodash-es": "^4.17.21",
