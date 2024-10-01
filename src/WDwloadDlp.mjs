@@ -396,9 +396,20 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     //check
     if (!fsIsFile(fpInMp4)) {
-        console.log(`can not find the merged file[${fpInMp4}]`)
-        errTemp = `invalid url[${url}] or can not download`
-        return Promise.reject(errTemp)
+
+        //_fpInMp4, dlp針對某些mp4下載後會無法自動提供副檔名, 得再偵測無副檔名之檔案是否存在
+        let _fpInMp4 = path.resolve(fdDownloads, id)
+
+        //check
+        if (!fsIsFile(_fpInMp4)) {
+            console.log(`can not find the merged file[${fpInMp4}]`)
+            errTemp = `invalid url[${url}] or can not download`
+            return Promise.reject(errTemp)
+        }
+
+        //modify
+        fpInMp4 = _fpInMp4
+
     }
 
     //fpOut
