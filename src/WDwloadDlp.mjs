@@ -243,7 +243,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
     // let bdl = false
     let nnPre = 0
     let nn = 0
-    let na = 100 //default
+    let nnTotal = 100 //default
     let naf = 0
     let prog = 0
     let bFunProg = isfun(funProg)
@@ -344,9 +344,9 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
         //update nn
         if (naf > 0) {
-            na = naf
+            nnTotal = naf
         }
-        nn = cint(prog / 100 * na)
+        nn = cint(prog / 100 * nnTotal)
         // console.log('nn', nn, 'nat', nat)
 
         //check, 若nn沒有>nnPre則視為不需要觸發funProg, 減少切太細導致高頻觸發
@@ -354,10 +354,10 @@ async function WDwloadDlp(url, fp, opt = {}) {
             return
         }
 
-        //call
+        //funProg
         if (bFunProg) {
             // console.log('prog', nn, nat, prog)
-            funProg(prog, nn, na)
+            funProg(prog, nn, nnTotal)
         }
 
         //update
@@ -378,13 +378,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
             console.log('execProcess catch', err)
             errTemp = 'execProcess error'
         })
-
-    //call
-    if (bFunProg) {
-        prog = 100
-        // console.log('prog', prog)
-        funProg(prog, na, na) //因是強制100%, 故nn要直接給na
-    }
 
     //chdir, 不論正常或錯誤皆需還原工作路徑
     process.chdir(cwdOri)
@@ -426,6 +419,11 @@ async function WDwloadDlp(url, fp, opt = {}) {
     //fsDeleteFile
     rc = fsDeleteFile(fpInMp4)
     //可能無檔案無法刪, 故不檢查錯誤
+
+    //funProg
+    if (bFunProg) {
+        funProg(100, nnTotal, nnTotal)
+    }
 
     return 'ok'
 }
