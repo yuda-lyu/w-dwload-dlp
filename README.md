@@ -12,14 +12,12 @@ A download tool for video.
 To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-dwload-dlp/global.html).
 
 ## Core
-> `w-dwload-dlp` is basing on `yt-dlp`.
+> `w-dwload-dlp` is basing on `yt-dlp`, and should run in `Windows`.
 
 > The ffmpeg.exe file is too large and will be split into small zip files for upload. If ffmpeg is missing during the first execution, it will be automatically decompressed from the zip file.
 
 ## Installation
 ### Using npm(ES6 module):
-> **Note:** `w-dwload-dlp` is mainly dependent on `lodash-es` and `wsemi`, and should run in `Windows`.
-
 ```alias
 npm i w-dwload-dlp
 ```

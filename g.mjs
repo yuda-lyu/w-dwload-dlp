@@ -37,4 +37,4 @@ test()
 // prog 100.00% 99 99
 // done: ./test.mp4
 
-//node --experimental-modules g.mjs
+//node g.mjs

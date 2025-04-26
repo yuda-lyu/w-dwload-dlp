@@ -1,17 +1,17 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
     "lodash-es": "^4.17.21",
     "w-zip": "^1.0.19",
-    "wsemi": "^1.7.64"
+    "wsemi": "^1.7.89"
   },
   "devDependencies": {
-    "w-package-tools": "^1.0.82"
+    "w-package-tools": "^1.0.87"
   },
   "scripts": {
-    "test": "mocha --parallel --timeout 60000 --experimental-modules",
+    "test": "mocha --parallel --timeout 60000",
     "deploy": "gh-pages -d docs"
   },
   "repository": {
