@@ -256,6 +256,20 @@ async function WDwloadDlp(url, fp, opt = {}) {
         let s = sep(msg, ' ')
         // console.log('s', s)
 
+        //stdout分不同frag之進度:
+        // stdout [download]   4.0% of ~   6.17MiB at   99.52KiB/s ETA Unknown (frag 1/99)
+        // stdout [download]   2.4% of ~  12.36MiB at  262.95KiB/s ETA Unknown (frag 1/99)
+        // stdout [download]   1.0% of ~  29.18MiB at  262.95KiB/s ETA Unknown (frag 2/99)
+        // stdout [download]   3.0% of ~   9.74MiB at  329.58KiB/s ETA Unknown (frag 2/99)
+        // stdout [download]   3.1% of ~   9.77MiB at  329.58KiB/s ETA Unknown (frag 2/99)
+
+        //stdout無frag之進度:
+        // stdout [download]   0.0% of  153.09MiB at    1.43MiB/s ETA 01:49
+        // stdout [download]   0.1% of  153.09MiB at    1.41MiB/s ETA 01:48
+        // stdout [download]   0.2% of  153.09MiB at    1.75MiB/s ETA 01:27
+        // stdout [download]   0.3% of  153.09MiB at    2.43MiB/s ETA 01:02
+        // stdout [download]   0.7% of  153.09MiB at    2.75MiB/s ETA 00:55
+
         //fmts
         if (msg.indexOf('format(s):') >= 0) {
             let ss = sep(msg, 'format(s):')
@@ -263,6 +277,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
             fmts = sep(ss1, '+')
             // console.log('fmts', fmts)
             da = size(fmts)
+            // console.log('da', da, fmts, msg)
         }
 
         //自動更新fmts, 並將size(fmts)視為階段數
@@ -283,20 +298,36 @@ async function WDwloadDlp(url, fp, opt = {}) {
             }
         }
 
-        //自動更新na
-        if (naf === 0 && msg.indexOf('(frag') >= 0) {
-            //(frag 82/99)
-            let ss = sep(msg, '(frag')
-            let ss1 = get(ss, 1, '')
-            ss1 = ss1.replaceAll(')', '')
-            let nnna = sep(ss1, '/')
-            let _na = get(nnna, 1, '')
-            if (isnum(_na)) {
-                _na = cint(_na)
-                if (_na > 0) {
-                    naf = _na
-                    // console.log('naf', naf)
+        //自動更新naf
+        if (naf === 0) {
+            if (msg.indexOf(' ETA ') >= 0) {
+                if (msg.indexOf('(frag') >= 0) {
+                    //(frag 82/99)
+                    let ss = sep(msg, '(frag')
+                    let ss1 = get(ss, 1, '')
+                    ss1 = ss1.replaceAll(')', '')
+                    let nnna = sep(ss1, '/')
+                    let _naf = get(nnna, 1, '')
+                    if (isnum(_naf)) {
+                        _naf = cint(_naf)
+                        if (_naf > 0) {
+                            naf = _naf
+                            // console.log('naf', naf)
+                        }
+                    }
                 }
+                else {
+                    //沒有frag, 例如直接下載mp4檔案
+                    naf = 100
+                }
+            }
+        }
+
+        //更新dn
+        if (dn === 0) {
+            if (msg.indexOf(' ETA ') >= 0 && msg.indexOf('(frag') < 0) {
+                //若dn=0, 若有下載訊息ETA出現但沒有看到階段frag, 則視為1階
+                dn = 1
             }
         }
 
@@ -311,6 +342,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
         //prog
         let _prog = 0
         if (bp) {
+            // console.log(s, s1)
             _prog = strdelright(s1, 1)
             _prog = cdbl(_prog)
             // console.log('_prog(ori)', _prog)
@@ -322,6 +354,10 @@ async function WDwloadDlp(url, fp, opt = {}) {
             //rDif, rPre
             let rDif = 1 / da
             let pPre = ((dn - 1) / da) * 100
+            // console.log('dn', dn)
+            // console.log('da', da)
+            // console.log('pPre', pPre)
+            // console.log('rDif', rDif)
 
             //計算分階段值
             _prog = rDif * _prog + pPre

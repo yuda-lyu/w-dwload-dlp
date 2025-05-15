@@ -5,10 +5,11 @@ import WDwloadDlp from './src/WDwloadDlp.mjs'
 async function test() {
 
     //url
-    // let url = `https://www.youtube.com/watch?v=uj8hjLyEBmU` //youtube mp4
-    let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
+    let url = `https://www.youtube.com/watch?v=uj8hjLyEBmU` //youtube mp4
+    // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
+    // let url = `https://ooo.mp4` //直接提供mp4檔
 
     //fp
     let fp = './test.mp4'
