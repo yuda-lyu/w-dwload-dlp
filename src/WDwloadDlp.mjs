@@ -1,5 +1,4 @@
 import path from 'path'
-import fs from 'fs'
 import process from 'process'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
@@ -10,13 +9,11 @@ import sep from 'wsemi/src/sep.mjs'
 import strright from 'wsemi/src/strright.mjs'
 import strdelright from 'wsemi/src/strdelright.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
-import isearr from 'wsemi/src/isearr.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import cint from 'wsemi/src/cint.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
-import genPm from 'wsemi/src/genPm.mjs'
 import execProcess from 'wsemi/src/execProcess.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
@@ -25,6 +22,7 @@ import fsRenameFile from 'wsemi/src/fsRenameFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
 import fsDeleteFolder from 'wsemi/src/fsDeleteFolder.mjs'
+import fsMergeFiles from 'wsemi/src/fsMergeFiles.mjs'
 import mZip from 'w-zip/src/mZip.mjs'
 
 
@@ -33,47 +31,6 @@ let fdSrv = path.resolve()
 
 function isWindows() {
     return process.platform === 'win32'
-}
-
-
-function fsMergeFiles(files, target) {
-
-    //check
-    if (!isearr(files) && !isestr(files)) {
-        throw new Error(`files[${files}] is not an effective string or array`)
-    }
-    if (!isearr(files)) {
-        files = [files]
-    }
-
-    //pm
-    let pm = genPm()
-
-    //writeable
-    let writeable = fs.createWriteStream(target)
-
-    //core
-    let core = () => {
-        if (size(files) === 0) {
-            writeable.end()
-            pm.resolve()
-        }
-        else {
-            let readable = fs.createReadStream(files.shift())
-            readable.pipe(writeable, { end: false })
-            readable.on('end', () => {
-                core()
-            })
-            readable.on('error', (err) => {
-                pm.reject(err)
-            })
-        }
-    }
-
-    //core
-    core()
-
-    return pm
 }
 
 
