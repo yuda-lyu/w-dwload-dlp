@@ -46,21 +46,24 @@ function isWindows() {
  * @param {Function} [opt.funProg=null] 輸入回傳進度函數，傳入參數為prog代表進度百分比、nn代表當前已下載ts檔案數量、na代表全部須下載ts檔案數量，預設null
  * @returns {Promise} 回傳Promise，resolve回傳成功訊息，reject回傳錯誤訊息
  * @example
- * // import WDwloadDlp from 'w-dwload-dlp'
+ * import fs from 'fs'
  * import WDwloadDlp from './src/WDwloadDlp.mjs'
  *
  * async function test() {
  *
  *     //url
- *     let url = `https://www.youtube.com/watch?v=uj8hjLyEBmU&ab_channel=%E7%A0%81%E5%86%9C%E9%AB%98%E5%A4%A9` //youtube
+ *     let url = `https://www.youtube.com/watch?v=ygA19W750zc` //youtube mp4
+ *     // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
+ *     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
  *     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
+ *     // let url = `https://ooo.mp4` //直接提供mp4檔
  *
  *     //fp
- *     let fp = './test.mp4'
+ *     let fp = './abc.mp4'
  *
  *     //funProg
- *     let funProg = (prog, nn, nat) => {
- *         console.log('prog', `${prog.toFixed(2)}%`, nn, nat)
+ *     let funProg = (prog, nn, na) => {
+ *         console.log('prog', `${prog.toFixed(2)}%`, nn, na)
  *     }
  *
  *     //WDwloadDlp
@@ -68,6 +71,10 @@ function isWindows() {
  *         clean: true, //單一程序執行時, 事先清除之前暫存檔, 減少浪費硬碟空間
  *         funProg,
  *     })
+ *
+ *     //len
+ *     let len = fs.statSync(fp).size
+ *     console.log('len', len)
  *
  *     console.log('done:', fp)
  * }
@@ -80,7 +87,8 @@ function isWindows() {
  * // ...
  * // prog 99.00% 98 99
  * // prog 100.00% 99 99
- * // done: ./test.mp4
+ * // len 22394508
+ * // done: ./abc.mp4
  *
  */
 async function WDwloadDlp(url, fp, opt = {}) {
@@ -117,7 +125,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     //exeDlp
     let exeDlp = path.resolve(fdExe, 'yt-dlp.exe')
-    exeDlp = `"${exeDlp}"` //用雙引號包住避免路徑有空格
+    // exeDlp = `"${exeDlp}"` //用雙引號包住避免路徑有空格 //execProcess預設使用spawn不須雙引號括住
     // console.log('exeDlp', exeDlp)
 
     //exeFfmpeg
@@ -359,7 +367,8 @@ async function WDwloadDlp(url, fp, opt = {}) {
     }
 
     //cmdDl
-    let cmdDl = `"${url}" -o "${fpInAny}" --newline --merge-output-format "mp4"`
+    // let cmdDl = `"${url}" -o "${fpInAny}" --newline --merge-output-format "mp4"`
+    let cmdDl = [url, '-o', fpInAny, '--newline', '--merge-output-format', 'mp4'] //execProcess預設使用spawn不須雙引號括住
     // console.log('cmdDl', cmdDl)
 
     //execProcess

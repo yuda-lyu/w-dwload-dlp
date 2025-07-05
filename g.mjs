@@ -1,18 +1,18 @@
-// import WDwloadDlp from 'w-dwload-dlp'
+import fs from 'fs'
 import WDwloadDlp from './src/WDwloadDlp.mjs'
 
 
 async function test() {
 
     //url
-    let url = `https://www.youtube.com/watch?v=uj8hjLyEBmU` //youtube mp4
+    let url = `https://www.youtube.com/watch?v=ygA19W750zc` //youtube mp4
     // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
     // let url = `https://ooo.mp4` //直接提供mp4檔
 
     //fp
-    let fp = './test.mp4'
+    let fp = './abc.mp4'
 
     //funProg
     let funProg = (prog, nn, na) => {
@@ -25,6 +25,10 @@ async function test() {
         funProg,
     })
 
+    //len
+    let len = fs.statSync(fp).size
+    console.log('len', len)
+
     console.log('done:', fp)
 }
 test()
@@ -36,6 +40,7 @@ test()
 // ...
 // prog 99.00% 98 99
 // prog 100.00% 99 99
-// done: ./test.mp4
+// len 22394508
+// done: ./abc.mp4
 
 //node g.mjs
