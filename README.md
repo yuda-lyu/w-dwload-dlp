@@ -17,6 +17,7 @@ To view documentation or get support, visit [docs](https://yuda-lyu.github.io/w-
 > The ffmpeg.exe file is too large and will be split into small zip files for upload. If ffmpeg is missing during the first execution, it will be automatically decompressed from the zip file.
 
 ## Installation
+
 ### Using npm(ES6 module):
 ```alias
 npm i w-dwload-dlp
