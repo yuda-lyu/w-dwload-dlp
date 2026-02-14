@@ -51,7 +51,7 @@ function isWindows() {
  * async function test() {
  *
  *     //url
- *     let url = `https://www.youtube.com/watch?v=ygA19W750zc` //youtube mp4
+ *     let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4` //youtube mp4
  *     // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
  *     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
  *     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
@@ -378,7 +378,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     //cmdDl
     // let cmdDl = `"${url}" -o "${fpInAny}" --newline --merge-output-format "mp4"`
-    let cmdDl = [url, '-o', fpInAny, '--newline', '--merge-output-format', 'mp4'] //execProcess預設使用spawn不須雙引號括住
+    let cmdDl = [url, '-o', fpInAny, '--newline', '--no-playlist', '--merge-output-format', 'mp4'] //execProcess預設使用spawn不須雙引號括住
     // console.log('cmdDl', cmdDl)
 
     //execProcess

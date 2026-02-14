@@ -5,7 +5,7 @@ import WDwloadDlp from './src/WDwloadDlp.mjs'
 async function test() {
 
     //url
-    let url = `https://www.youtube.com/watch?v=ygA19W750zc` //youtube mp4
+    let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4&list=RDjfXg5ZslKg4&start_radio=1` //youtube mp4
     // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm
     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili

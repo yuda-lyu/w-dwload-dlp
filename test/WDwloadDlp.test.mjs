@@ -18,7 +18,7 @@ describe('WDwloadDlp', function() {
     async function test() {
 
         //url
-        let url = `https://www.youtube.com/watch?v=ygA19W750zc` //youtube mp4
+        let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4` //youtube mp4
 
         //fp
         let fp = './abc.mp4'
@@ -49,7 +49,7 @@ describe('WDwloadDlp', function() {
     //     })
 
     it('download', async function() {
-        let r = 22394508
+        let r = 17861856
         let rr = await test()
         assert.strict.deepEqual(r, rr)
     })

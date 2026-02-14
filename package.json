@@ -1,11 +1,11 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
-    "lodash-es": "^4.17.21",
+    "lodash-es": "^4.17.23",
     "w-zip": "^1.0.22",
-    "wsemi": "^1.8.26"
+    "wsemi": "^1.8.42"
   },
   "devDependencies": {
     "w-package-tools": "^1.1.2"
