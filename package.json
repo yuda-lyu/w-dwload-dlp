@@ -1,14 +1,14 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
-    "lodash-es": "^4.17.23",
+    "lodash-es": "^4.18.1",
     "w-zip": "^1.0.22",
-    "wsemi": "^1.8.42"
+    "wsemi": "^1.8.54"
   },
   "devDependencies": {
-    "w-package-tools": "^1.1.2"
+    "w-package-tools": "^1.1.7"
   },
   "scripts": {
     "test": "mocha --parallel --timeout 60000",

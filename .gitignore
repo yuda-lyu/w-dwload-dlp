@@ -1,3 +1,5 @@
 node_modules
+.opencode
+.claude
 yt-dlp/Downloads
 yt-dlp/ffmpeg.exe

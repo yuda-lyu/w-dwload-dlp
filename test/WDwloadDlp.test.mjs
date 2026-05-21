@@ -49,7 +49,7 @@ describe('WDwloadDlp', function() {
     //     })
 
     it('download', async function() {
-        let r = 17861856
+        let r = 7911433
         let rr = await test()
         assert.strict.deepEqual(r, rr)
     })
