@@ -1,5 +1,6 @@
 import path from 'path'
 import process from 'process'
+import { createRequire } from 'module'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
 import each from 'lodash-es/each.js'
@@ -17,12 +18,8 @@ import cdbl from 'wsemi/src/cdbl.mjs'
 import execProcess from 'wsemi/src/execProcess.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
-import fsRenameFile from 'wsemi/src/fsRenameFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
-import fsDeleteFolder from 'wsemi/src/fsDeleteFolder.mjs'
-import fsMergeFiles from 'wsemi/src/fsMergeFiles.mjs'
-import mZip from 'w-zip/src/mZip.mjs'
 
 
 let fdSrv = path.resolve()
@@ -138,46 +135,42 @@ async function WDwloadDlp(url, fp, opt = {}) {
     // fpExeDlp = `"${fpExeDlp}"` //用雙引號包住避免路徑有空格 //execProcess預設使用spawn不須雙引號括住
     // console.log('fpExeDlp', fpExeDlp)
 
-    //fpExeFfmpeg
-    let fpExeFfmpeg = path.resolve(fdExe, 'ffmpeg.exe')
-    // console.log('fpExeFfmpeg', fpExeFfmpeg)
+    //fnExeFfmpeg
+    let fnExeFfmpeg = 'ffmpeg.exe'
 
-    //check ffmpeg, 若ffmpeg不存在則由分拆zip檔解壓縮出來用
-    if (!fsIsFile(fpExeFfmpeg)) {
+    //fdFfmpeg, 取用已安裝的w-ffmpeg套件內src/ (與fdExe同風格)
+    let fdFfmpeg = ''
+    if (true) {
 
-        //zipFfmpeg
-        let zipFfmpeg = path.resolve(fdExe, 'ffmpeg.zip')
-
-        //fsMergeFiles to ffmpeg.zip
-        let fp1 = path.resolve(fdExe, 'ffmpeg.zip.001')
-        let fp2 = path.resolve(fdExe, 'ffmpeg.zip.002')
-        let fp3 = path.resolve(fdExe, 'ffmpeg.zip.003')
-        let fp4 = path.resolve(fdExe, 'ffmpeg.zip.004')
-        let fp5 = path.resolve(fdExe, 'ffmpeg.zip.005')
-        await fsMergeFiles([fp1, fp2, fp3, fp4, fp5], zipFfmpeg)
-
-        //unzip
-        let fdFfmpeg = path.resolve(fdExe, 'temp')
-        if (true) {
-            await mZip.unzip(zipFfmpeg, fdFfmpeg)
-            // console.log('mZip.unzip', r)
+        let fdFfmpegHoist = `${fdSrv}/node_modules/w-ffmpeg/src/` //一般hoisted(含開發w-dwload-dlp本身時)
+        if (!isestr(fdFfmpeg) && fsIsFile(`${fdFfmpegHoist}${fnExeFfmpeg}`)) {
+            fdFfmpeg = fdFfmpegHoist
         }
 
-        //fsRenameFile ffmpeg.exe
-        if (true) {
-            let fpExeFfmpegTemp = path.resolve(`${fdFfmpeg}/`, 'ffmpeg.exe')
-            // console.log('fpExeFfmpegTemp', fpExeFfmpegTemp)
-            fsRenameFile(fpExeFfmpegTemp, fpExeFfmpeg)
-            // console.log('fsRenameFile', r)
+        //createRequire, 未hoist(版本衝突巢狀)等情形, 由node自身解析w-ffmpeg實際位置(不受巢狀深度影響)
+        if (!isestr(fdFfmpeg)) {
+            try {
+                let nodeRequire = createRequire(import.meta.url)
+                let fdFfmpegReq = `${path.dirname(nodeRequire.resolve('w-ffmpeg/package.json'))}/src/`
+                if (fsIsFile(`${fdFfmpegReq}${fnExeFfmpeg}`)) {
+                    fdFfmpeg = fdFfmpegReq
+                }
+            }
+            catch (err) {
+                //resolve失敗代表找不到w-ffmpeg, 留待下方統一reject
+            }
         }
 
-        //fsDeleteFile ffmpeg.zip
-        fsDeleteFile(zipFfmpeg)
-
-        //fsDeleteFolder temp
-        fsDeleteFolder(fdFfmpeg)
+        if (!isestr(fdFfmpeg)) {
+            return Promise.reject('can not find folder for ffmpeg (w-ffmpeg)')
+        }
 
     }
+    // console.log('fdFfmpeg', fdFfmpeg)
+
+    //fpExeFfmpeg
+    let fpExeFfmpeg = path.resolve(fdFfmpeg, fnExeFfmpeg)
+    // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
     //cwdOri, cwdTar
     let cwdOri = process.cwd()
@@ -378,7 +371,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     //cmdDl
     // let cmdDl = `"${url}" -o "${fpInAny}" --newline --merge-output-format "mp4"`
-    let cmdDl = [url, '-o', fpInAny, '--newline', '--no-playlist', '--merge-output-format', 'mp4'] //execProcess預設使用spawn不須雙引號括住
+    let cmdDl = [url, '-o', fpInAny, '--newline', '--no-playlist', '--merge-output-format', 'mp4', '--ffmpeg-location', fpExeFfmpeg] //execProcess預設使用spawn不須雙引號括住
     // console.log('cmdDl', cmdDl)
 
     //execProcess
