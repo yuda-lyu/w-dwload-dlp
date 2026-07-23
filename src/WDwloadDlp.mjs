@@ -107,7 +107,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     //check
     if (!isestr(url)) {
-        return Promise.reject('url is not a file')
+        return Promise.reject('invalid url')
     }
 
     //fnExeDlp
