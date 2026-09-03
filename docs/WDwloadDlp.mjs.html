@@ -97,9 +97,10 @@ function isWindows() {
  *     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
  *     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
  *     // let url = `https://ooo.mp4` //直接提供mp4檔
+ *     // let url = `https://cdn.jsdelivr.net/npm/w-demores/res/video/aigen_hls/playlist.m3u8`
  *
  *     //fp
- *     let fp = './abc.mp4'
+ *     let fp = './test.mp4'
  *
  *     //funProg
  *     let funProg = (prog, nn, na) => {
@@ -128,7 +129,7 @@ function isWindows() {
  * // prog 99.00% 98 99
  * // prog 100.00% 99 99
  * // len 22394508
- * // done: ./abc.mp4
+ * // done: ./test.mp4
  *
  */
 async function WDwloadDlp(url, fp, opt = {}) {
@@ -204,13 +205,12 @@ async function WDwloadDlp(url, fp, opt = {}) {
     let nnPre = 0
     let nn = 0
     let nnTotal = 100 //default
-    let naf = 0
+    let naf = 0 //全部須下載fragment(ts)數量, 0代表尚未取得
+    let nnf = 0 //當前已下載fragment(ts)數量
     let prog = 0
     let bFunProg = isfun(funProg)
-    let cbStdout = (msg) => {
-        // console.log('cbStdout', msg)
-        msg = msg.replaceAll('\n', ' ') //可能多訊息合併觸發, 去除換行符號不分列處理, 並只偵測處理前面(第1條)
-        // console.log('cbStdout', `*${msg}*`)
+    let parseLine = (msg) => {
+        // console.log('parseLine', msg)
 
         //s
         let s = sep(msg, ' ')
@@ -258,58 +258,85 @@ async function WDwloadDlp(url, fp, opt = {}) {
             }
         }
 
-        //自動更新naf
+        //自動更新naf, 優先由hlsnative(m3u8)或dashsegments所報之總片段數取得, 例如 [hlsnative] Total fragments: 37
         if (naf === 0) {
-            if (msg.indexOf(' ETA ') >= 0) {
-                if (msg.indexOf('(frag') >= 0) {
-                    //(frag 82/99)
-                    let ss = sep(msg, '(frag')
-                    let ss1 = get(ss, 1, '')
-                    ss1 = ss1.replaceAll(')', '')
-                    let nnna = sep(ss1, '/')
-                    let _naf = get(nnna, 1, '')
-                    if (isnum(_naf)) {
-                        _naf = cint(_naf)
-                        if (_naf > 0) {
-                            naf = _naf
-                            // console.log('naf', naf)
-                        }
+            if (msg.indexOf('Total fragments:') >= 0) {
+                let ss = sep(msg, 'Total fragments:')
+                let _naf = get(ss, 1, '')
+                if (isnum(_naf)) {
+                    _naf = cint(_naf)
+                    if (_naf > 0) {
+                        naf = _naf
+                        // console.log('naf', naf)
                     }
-                }
-                else {
-                    //沒有frag, 例如直接下載mp4檔案
-                    naf = 100
                 }
             }
         }
 
-        //更新dn
+        //nf, nfa, 由進度列取得當前fragment序號與該列所報之總fragment數, 例如 (frag 82/99)
+        let nf = -1
+        let nfa = 0
+        if (msg.indexOf('(frag') >= 0) {
+            let ss = sep(msg, '(frag')
+            let ss1 = get(ss, 1, '')
+            ss1 = ss1.replaceAll(')', '')
+            let nnna = sep(ss1, '/')
+            let _nf = get(nnna, 0, '')
+            let _nfa = get(nnna, 1, '')
+            if (isnum(_nf)) {
+                nf = cint(_nf)
+            }
+            if (isnum(_nfa)) {
+                _nfa = cint(_nfa)
+                if (_nfa > 0) {
+                    nfa = _nfa
+                }
+            }
+        }
+
+        //自動更新naf, 次要由進度列之frag資訊取得
+        if (naf === 0 &amp;&amp; nfa > 0) {
+            naf = nfa
+        }
+
+        //更新nnf, 取最大值使其單調遞增
+        if (nf > nnf) {
+            nnf = nf
+        }
+
+        //更新dn, 補救單一format時輸出檔名不帶.f&lt;fmt>.標記致dn恆為0之情形,
+        //單一format涵蓋m3u8走hlsnative(檔名如xxx.mp4)與直接下載mp4(檔名如xxx.mp4),
+        //只要出現下載進度列(有ETA或有frag)即視為已進入第1階段
         if (dn === 0) {
-            if (msg.indexOf(' ETA ') >= 0 &amp;&amp; msg.indexOf('(frag') &lt; 0) {
-                //若dn=0, 若有下載訊息ETA出現但沒有看到階段frag, 則視為1階
+            if (msg.indexOf(' ETA ') >= 0 || nf >= 0) {
                 dn = 1
             }
         }
 
-        //s1
-        let s1 = get(s, 1, '')
-
-        //bp
-        let bp1 = strright(s1, 1) === '%'
-        let bp2 = msg.indexOf('(frag 0/') >= 0 //第1個可能是下載清單瞬間會100%, 直接忽略不考慮
-        let bp = bp1 &amp;&amp; !bp2
-
         //prog
         let _prog = 0
-        if (bp) {
-            // console.log(s, s1)
-            _prog = strdelright(s1, 1)
-            _prog = cdbl(_prog)
-            // console.log('_prog(ori)', _prog)
+        if (nfa > 0) {
+
+            //有frag資訊時直接以fragment比例為準, 不採該列所報之百分比,
+            //因該百分比是當前單一fragment之估計值, 會出現59.1%後又降為54.4%之跳動,
+            //以其為準會令進度瞬間衝頂而後續全被單調遞增檢核擋掉
+            _prog = nf / nfa * 100
+
+        }
+        else {
+
+            //無frag時取列首百分比, 例如 [download]  24.8% of  29.28MiB at 2.08MiB/s ETA 00:10
+            //或階段完成列, 例如 [download] 100% of 45.39MiB in 00:00:06 at 6.54MiB/s
+            let s1 = get(s, 1, '')
+            if (strright(s1, 1) === '%') {
+                _prog = cdbl(strdelright(s1, 1))
+                // console.log('_prog(ori)', _prog)
+            }
+
         }
 
         //依照階段重算_prog
-        if (_prog > 0) {
+        if (dn > 0) {
 
             //rDif, rPre
             let rDif = 1 / da
@@ -324,10 +351,20 @@ async function WDwloadDlp(url, fp, opt = {}) {
             // console.log('_prog(stage)', _prog)
 
         }
+        else {
+            //尚未進入任何下載階段
+            _prog = 0
+        }
 
-        //最高99%, 因可能還有轉檔(例如webm轉mp4), 故最後100%改由最後完成階段觸發
+        //最高99%, 因可能還有轉檔(例如webm轉mp4或FixupM3u8), 故最後100%改由最後完成階段觸發
         _prog *= 0.99
         // console.log('_prog(99%)', _prog)
+
+        //update nnTotal, 須於下方單調遞增檢核之前更新, 否則進度未推進時將停在預設值,
+        //致結尾之funProg(100, nnTotal, nnTotal)回報錯誤的na
+        if (naf > 0) {
+            nnTotal = naf
+        }
 
         //update
         if (prog &lt; _prog) {
@@ -339,11 +376,15 @@ async function WDwloadDlp(url, fp, opt = {}) {
         // console.log('prog(now)', prog)
 
         //update nn
-        if (naf > 0) {
-            nnTotal = naf
+        if (da === 1 &amp;&amp; naf > 0) {
+            //單一階段且有fragment資訊時直接以fragment序號為已下載數量, 語義同JSDoc所述之已下載ts檔案數量
+            nn = nnf
         }
-        nn = cint(prog / 100 * nnTotal)
-        // console.log('nn', nn, 'nat', nat)
+        else {
+            //多階段或無fragment資訊時仍以百分比換算
+            nn = cint(prog / 100 * nnTotal)
+        }
+        // console.log('nn', nn, 'nnTotal', nnTotal)
 
         //check, 若nn沒有>nnPre則視為不需要觸發funProg, 減少切太細導致高頻觸發
         if (nn &lt;= nnPre) {
@@ -352,12 +393,26 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
         //funProg
         if (bFunProg) {
-            // console.log('prog', nn, nat, prog)
+            // console.log('prog', nn, nnTotal, prog)
             funProg(prog, nn, nnTotal)
         }
 
         //update
         nnPre = nn
+
+    }
+    let cbStdout = (msg) => {
+        // console.log('cbStdout', msg)
+
+        //可能多訊息合併觸發, 故須分列各自解析, 否則高速下載時各列之百分比與frag序號僅會取到第1列
+        let ls = sep(msg, '\n')
+        each(ls, (l) => {
+            l = l.trim()
+            if (l === '') {
+                return
+            }
+            parseLine(l)
+        })
 
     }
 
@@ -440,7 +495,7 @@ export default WDwloadDlp
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Thu Sep 03 2026 14:32:26 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Thu Sep 03 2026 16:13:29 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

@@ -10,9 +10,10 @@ async function test() {
     // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm
     // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili
     // let url = `https://ooo.mp4` //直接提供mp4檔
+    // let url = `https://cdn.jsdelivr.net/npm/w-demores/res/video/aigen_hls/playlist.m3u8`
 
     //fp
-    let fp = './abc.mp4'
+    let fp = './test.mp4'
 
     //funProg
     let funProg = (prog, nn, na) => {
@@ -41,6 +42,6 @@ test()
 // prog 99.00% 98 99
 // prog 100.00% 99 99
 // len 22394508
-// done: ./abc.mp4
+// done: ./test.mp4
 
 //node g.mjs

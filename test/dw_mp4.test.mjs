@@ -8,7 +8,7 @@ function isWindows() {
 }
 
 
-describe('WDwloadDlp', function() {
+describe('WDwloadDlp mp4', function() {
 
     //check
     if (!isWindows()) {
@@ -21,7 +21,7 @@ describe('WDwloadDlp', function() {
         let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4` //youtube mp4
 
         //fp
-        let fp = './abc.mp4'
+        let fp = './test_mp4.mp4'
 
         //funProg
         let funProg = (prog, nn, na) => {
@@ -49,7 +49,7 @@ describe('WDwloadDlp', function() {
     //     })
 
     it('download', async function() {
-        let r = 7911433
+        let r = 50947689
         let rr = await test()
         assert.strict.deepEqual(r, rr)
     })
