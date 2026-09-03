@@ -1,6 +1,5 @@
 import path from 'path'
 import process from 'process'
-import { createRequire } from 'module'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
 import each from 'lodash-es/each.js'
@@ -20,6 +19,8 @@ import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
+import downloadFilesFfmpeg from 'w-ffmpeg/src/downloadFiles.mjs'
+import downloadFilesDlp from './downloadFiles.mjs'
 
 
 let fdSrv = path.resolve()
@@ -125,6 +126,16 @@ async function WDwloadDlp(url, fp, opt = {}) {
             fdExe = fdExeNM
         }
         else {
+
+            //downloadFilesDlp, 無yt-dlp.exe代表安裝時npm封鎖scripts致postinstall未執行,
+            //故於此重新執行下載, 落點同為本套件內yt-dlp/
+            await downloadFilesDlp(fdExeNM)
+            if (fsIsFile(`${fdExeNM}${fnExeDlp}`)) {
+                fdExe = fdExeNM
+            }
+
+        }
+        if (!isestr(fdExe)) {
             return Promise.reject('can not find folder for yt-dlp')
         }
     }
@@ -138,33 +149,26 @@ async function WDwloadDlp(url, fp, opt = {}) {
     //fnExeFfmpeg
     let fnExeFfmpeg = 'ffmpeg.exe'
 
-    //fdFfmpeg, 取用已安裝的w-ffmpeg套件內src/ (與fdExe同風格)
+    //fdFfmpeg
     let fdFfmpeg = ''
     if (true) {
-
-        let fdFfmpegHoist = `${fdSrv}/node_modules/w-ffmpeg/src/` //一般hoisted(含開發w-dwload-dlp本身時)
-        if (!isestr(fdFfmpeg) && fsIsFile(`${fdFfmpegHoist}${fnExeFfmpeg}`)) {
-            fdFfmpeg = fdFfmpegHoist
+        let fdFfmpegNM = `${fdSrv}/node_modules/w-ffmpeg/src/`
+        if (fsIsFile(`${fdFfmpegNM}${fnExeFfmpeg}`)) {
+            fdFfmpeg = fdFfmpegNM
         }
+        else {
 
-        //createRequire, 未hoist(版本衝突巢狀)等情形, 由node自身解析w-ffmpeg實際位置(不受巢狀深度影響)
-        if (!isestr(fdFfmpeg)) {
-            try {
-                let nodeRequire = createRequire(import.meta.url)
-                let fdFfmpegReq = `${path.dirname(nodeRequire.resolve('w-ffmpeg/package.json'))}/src/`
-                if (fsIsFile(`${fdFfmpegReq}${fnExeFfmpeg}`)) {
-                    fdFfmpeg = fdFfmpegReq
-                }
+            //downloadFilesFfmpeg, 無ffmpeg.exe代表安裝時npm封鎖scripts致postinstall未執行,
+            //故於此重新執行w-ffmpeg之下載, 落點同為w-ffmpeg套件內src/
+            await downloadFilesFfmpeg(fdFfmpegNM)
+            if (fsIsFile(`${fdFfmpegNM}${fnExeFfmpeg}`)) {
+                fdFfmpeg = fdFfmpegNM
             }
-            catch (err) {
-                //resolve失敗代表找不到w-ffmpeg, 留待下方統一reject
-            }
+
         }
-
         if (!isestr(fdFfmpeg)) {
             return Promise.reject('can not find folder for ffmpeg (w-ffmpeg)')
         }
-
     }
     // console.log('fdFfmpeg', fdFfmpeg)
 

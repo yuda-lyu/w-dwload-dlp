@@ -1,9 +1,9 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
-    "w-ffmpeg": "^1.0.13",
+    "w-ffmpeg": "^1.0.14",
     "wsemi": "^1.8.84"
   },
   "devDependencies": {
