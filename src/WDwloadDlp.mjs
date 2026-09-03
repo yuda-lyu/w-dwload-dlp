@@ -19,11 +19,8 @@ import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
-import downloadFilesFfmpeg from 'w-ffmpeg/src/downloadFiles.mjs'
-import downloadFilesDlp from './downloadFiles.mjs'
-
-
-let fdSrv = path.resolve()
+import autoDownloadFilesFfmpeg from 'w-ffmpeg/src/autoDownloadFiles.mjs'
+import autoDownloadFilesDlp from './autoDownloadFiles.mjs'
 
 
 function isWindows() {
@@ -111,69 +108,17 @@ async function WDwloadDlp(url, fp, opt = {}) {
         return Promise.reject('invalid url')
     }
 
-    //fnExeDlp
-    let fnExeDlp = 'yt-dlp.exe'
-
-    //fdExe
-    let fdExe = ''
-    if (true) {
-        let fdExeSrc = `${fdSrv}/yt-dlp/`
-        let fdExeNM = `${fdSrv}/node_modules/w-dwload-dlp/yt-dlp/`
-        if (fsIsFile(`${fdExeSrc}${fnExeDlp}`)) {
-            fdExe = fdExeSrc
-        }
-        else if (fsIsFile(`${fdExeNM}${fnExeDlp}`)) {
-            fdExe = fdExeNM
-        }
-        else {
-
-            //downloadFilesDlp, 無yt-dlp.exe代表安裝時npm封鎖scripts致postinstall未執行,
-            //故於此重新執行下載, 落點同為本套件內yt-dlp/
-            await downloadFilesDlp(fdExeNM)
-            if (fsIsFile(`${fdExeNM}${fnExeDlp}`)) {
-                fdExe = fdExeNM
-            }
-
-        }
-        if (!isestr(fdExe)) {
-            return Promise.reject('can not find folder for yt-dlp')
-        }
-    }
-    // console.log('fdExe', fdExe)
-
-    //fpExeDlp
-    let fpExeDlp = path.resolve(fdExe, fnExeDlp)
+    //fpExeDlp, 自動定位yt-dlp.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
     // fpExeDlp = `"${fpExeDlp}"` //用雙引號包住避免路徑有空格 //execProcess預設使用spawn不須雙引號括住
+    let fpExeDlp = await autoDownloadFilesDlp()
     // console.log('fpExeDlp', fpExeDlp)
 
-    //fnExeFfmpeg
-    let fnExeFfmpeg = 'ffmpeg.exe'
+    //fdExe
+    let fdExe = path.dirname(fpExeDlp)
+    // console.log('fdExe', fdExe)
 
-    //fdFfmpeg
-    let fdFfmpeg = ''
-    if (true) {
-        let fdFfmpegNM = `${fdSrv}/node_modules/w-ffmpeg/src/`
-        if (fsIsFile(`${fdFfmpegNM}${fnExeFfmpeg}`)) {
-            fdFfmpeg = fdFfmpegNM
-        }
-        else {
-
-            //downloadFilesFfmpeg, 無ffmpeg.exe代表安裝時npm封鎖scripts致postinstall未執行,
-            //故於此重新執行w-ffmpeg之下載, 落點同為w-ffmpeg套件內src/
-            await downloadFilesFfmpeg(fdFfmpegNM)
-            if (fsIsFile(`${fdFfmpegNM}${fnExeFfmpeg}`)) {
-                fdFfmpeg = fdFfmpegNM
-            }
-
-        }
-        if (!isestr(fdFfmpeg)) {
-            return Promise.reject('can not find folder for ffmpeg (w-ffmpeg)')
-        }
-    }
-    // console.log('fdFfmpeg', fdFfmpeg)
-
-    //fpExeFfmpeg
-    let fpExeFfmpeg = path.resolve(fdFfmpeg, fnExeFfmpeg)
+    //fpExeFfmpeg, 自動定位ffmpeg.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
+    let fpExeFfmpeg = await autoDownloadFilesFfmpeg()
     // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
     //cwdOri, cwdTar
