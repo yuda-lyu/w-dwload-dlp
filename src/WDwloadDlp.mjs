@@ -19,8 +19,7 @@ import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
 import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
 import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
-import autoDownloadFilesFfmpeg from 'w-ffmpeg/src/autoDownloadFiles.mjs'
-import autoDownloadFilesDlp from './autoDownloadFiles.mjs'
+import autoDownloadFiles from './autoDownloadFiles.mjs'
 
 
 function isWindows() {
@@ -108,18 +107,15 @@ async function WDwloadDlp(url, fp, opt = {}) {
         return Promise.reject('invalid url')
     }
 
-    //fpExeDlp, 自動定位yt-dlp.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
+    //fpExeDlp, fpExeFfmpeg, 自動定位yt-dlp.exe與ffmpeg.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
     // fpExeDlp = `"${fpExeDlp}"` //用雙引號包住避免路徑有空格 //execProcess預設使用spawn不須雙引號括住
-    let fpExeDlp = await autoDownloadFilesDlp()
+    let { fpExeDlp, fpExeFfmpeg } = await autoDownloadFiles()
     // console.log('fpExeDlp', fpExeDlp)
+    // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
     //fdExe
     let fdExe = path.dirname(fpExeDlp)
     // console.log('fdExe', fdExe)
-
-    //fpExeFfmpeg, 自動定位ffmpeg.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
-    let fpExeFfmpeg = await autoDownloadFilesFfmpeg()
-    // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
     //cwdOri, cwdTar
     let cwdOri = process.cwd()
