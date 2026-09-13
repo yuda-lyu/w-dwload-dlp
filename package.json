@@ -1,17 +1,17 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
-    "w-ffmpeg": "^1.0.19",
-    "wsemi": "^1.8.85"
+    "w-ffmpeg": "^1.0.20",
+    "wsemi": "^1.8.92"
   },
   "devDependencies": {
-    "w-package-tools": "^1.1.15"
+    "w-package-tools": "^1.1.16"
   },
   "scripts": {
     "postinstall": "node scripts/install.mjs",
-    "test": "mocha --parallel --timeout 60000",
+    "test": "mocha --parallel \"test/*.test.mjs\" --timeout 180000",
     "deploy": "gh-pages -d docs"
   },
   "repository": {

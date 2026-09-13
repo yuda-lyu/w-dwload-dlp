@@ -3,3 +3,10 @@ yt-dlp/Downloads
 yt-dlp/ffmpeg.exe
 yt-dlp/yt-dlp.exe
 test*.mp4
+.agents
+.opencode
+.claude
+CLAUDE*.md
+AGENTS*.md
+.env
+tmp
