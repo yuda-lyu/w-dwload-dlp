@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#autoDownloadFiles">autoDownloadFiles</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#autoDownloadFiles">autoDownloadFiles</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
     
 </nav>
 
@@ -147,7 +147,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line88">line 88</a>
+        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line89">line 89</a>
     </li></ul></dd>
     
 
@@ -469,7 +469,7 @@
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳成功訊息，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳成功訊息，reject回傳錯誤訊息字串，首行固定為<code>[代碼] 說明與處置</code>供調用方判斷錯誤類型，代碼可為osNotSupported、invalidUrl、exeNotReady、outputNotFound、copyFailed，以及yt-dlp執行失敗時由parseDlpError分類之unsupportedUrl、unavailable、sslFailed、dnsFailed、connectFailed、http403、http404、httpError、dlpFailed、execFailed，yt-dlp執行失敗時次行起依序為下載進度(有fragment資訊時)與yt-dlp之ERROR、WARNING原文</p>
 </div>
 
 
@@ -627,6 +627,383 @@ test()
 
 
         
+            
+
+    
+
+    <h4 class="name" id="parseDlpError"><span class="type-signature"></span>parseDlpError<span class="signature">(stderr, opt<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {String}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>由yt-dlp之stderr提取錯誤並分類，組成調用方易讀之錯誤訊息</p>
+<p>回傳字串首行固定為<code>[代碼] 說明與處置</code>，供調用方判斷錯誤類型，次行起依序為下載進度(有fragment資訊時)、yt-dlp之ERROR原文、WARNING原文(去重後最多3行)</p>
+<p>代碼可為unsupportedUrl、unavailable、sslFailed、dnsFailed、connectFailed、http403、http404、httpError，有ERROR但不屬前述者為dlpFailed，無任何ERROR者為execFailed</p></li></ul></dd>
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="parseDlpError.mjs.html">parseDlpError.mjs</a>, <a href="parseDlpError.mjs.html#line80">line 80</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+    <h5 class="h5-examples">Example</h5>
+    
+    <pre class="prettyprint"><code>import parseDlpError from './src/parseDlpError.mjs'
+
+let stderr = 'ERROR: unable to download video data: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self signed certificate (_ssl.c:1007)\n'
+console.log(parseDlpError(stderr, { nnf: 24, naf: 406 }))
+// [sslFailed] ssl certificate verification failed, if the certificate comes from a network-level block page (e.g. DNS filtering) the domain is blocked, otherwise the source host has an invalid certificate
+// progress: 24/406 fragments downloaded before failure
+// ERROR: unable to download video data: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self signed certificate (_ssl.c:1007)</code></pre>
+
+
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>stderr</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入yt-dlp之stderr字串，其ERROR與WARNING皆輸出於此</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>opt</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>{}</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入設定物件，預設{}</p>
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>raw</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>''</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入execProcess之reject字串，供stderr無ERROR時備援，預設''</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>nnf</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Integer</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>0</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入失敗前已下載fragment數，預設0</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>naf</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Integer</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>0</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入全部須下載fragment數，0代表尚未進入fragment下載階段，預設0</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5 class="h5-returns">Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳錯誤訊息字串</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">String</span>
+
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
     
 
     
@@ -646,7 +1023,7 @@ test()
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 02 2026 18:59:55 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sat Oct 03 2026 17:20:07 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
