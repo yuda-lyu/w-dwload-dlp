@@ -10,3 +10,6 @@ CLAUDE*.md
 AGENTS*.md
 .env
 tmp
+
+# 指引要求文件入 git 版控、不入 npm 包(2026-10-22)
+sgud
