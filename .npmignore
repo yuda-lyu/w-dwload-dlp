@@ -2,6 +2,9 @@ node_modules
 yt-dlp/Downloads
 yt-dlp/ffmpeg.exe
 yt-dlp/yt-dlp.exe
+yt-dlp/manifest.json
+yt-dlp/*.part
+test/_tmp
 test*.mp4
 .agents
 .opencode

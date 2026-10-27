@@ -1,23 +1,14 @@
-import path from 'path'
-import fsIsFile from 'wsemi/src/fsIsFile.mjs'
-import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import autoDownloadFilesFfmpeg from 'w-ffmpeg/src/autoDownloadFiles.mjs'
-import downloadFiles from './downloadFiles.mjs'
-
-
-//fnExe, yt-dlp執行檔名稱
-let fnExe = 'yt-dlp.exe'
-
-
-//pmDownload, 下載中之Promise, 供併發呼叫共用同一次下載, 避免同時多次下載寫入同一批檔案
-let pmDownload = null
+import ensureDlpExe from './ensureDlpExe.mjs'
 
 
 /**
  * 自動定位yt-dlp.exe與ffmpeg.exe，若無檔案則自動下載，回傳各執行檔的絕對路徑
  *
  * yt-dlp.exe依序偵測當前工作路徑的yt-dlp/與node_modules/w-dwload-dlp/yt-dlp/，皆無時，
- * 代表安裝時npm封鎖scripts致postinstall未執行，故自動調用downloadFiles重新下載
+ * 代表安裝時npm封鎖scripts致postinstall未執行，故自動調用downloadFiles重新下載，
+ * 下載時會取同一分支之yt-dlp/manifest.json核對SHA-256與大小，相符才落檔，不符則失敗且不留檔(見ensureDlpExe與downloadFiles)；
+ * 既有之yt-dlp.exe直接採用，不重算雜湊、不連網
  *
  * ffmpeg.exe由w-ffmpeg之autoDownloadFiles負責偵測與下載，故基於本套件開發之套件或專案，
  * 僅須調用本函數即可備齊全部執行檔，無須各自再調用w-ffmpeg之autoDownloadFiles
@@ -49,53 +40,8 @@ let pmDownload = null
  */
 async function autoDownloadFiles() {
 
-    //fdSrv, 於調用時取當前工作路徑
-    let fdSrv = path.resolve()
-
-    //fdBaseSelf, fdBaseNM, yt-dlp.exe可能所在資料夾(開發套件本身時於cwd的yt-dlp/, 被安裝為相依套件時於node_modules/w-dwload-dlp/yt-dlp/)
-    let fdBaseSelf = `${fdSrv}/yt-dlp/`
-    let fdBaseNM = `${fdSrv}/node_modules/w-dwload-dlp/yt-dlp/`
-
-    //fdBase
-    let fdBase = ''
-    if (fsIsFile(`${fdBaseSelf}${fnExe}`)) {
-        fdBase = fdBaseSelf
-    }
-    else if (fsIsFile(`${fdBaseNM}${fnExe}`)) {
-        fdBase = fdBaseNM
-    }
-    else {
-
-        //fdBaseDL, 下載落點, 有node_modules/w-dwload-dlp/代表為被安裝之相依套件, 否則為套件自身
-        let fdBaseDL = fsIsFolder(`${fdSrv}/node_modules/w-dwload-dlp/`) ? fdBaseNM : fdBaseSelf
-
-        //downloadFiles, 無yt-dlp.exe代表安裝時npm封鎖scripts致postinstall未執行, 故於此重新執行下載,
-        //併發呼叫共用同一個下載Promise, 避免重複下載
-        if (pmDownload === null) {
-            pmDownload = downloadFiles(fdBaseDL)
-                .finally(() => {
-
-                    //下載結束(成敗皆然)歸零, 使下次呼叫重新依檔案是否存在判定; 若只於失敗時歸零, 下載成功後檔案被移除(重裝套件、防毒隔離)或程序切換工作路徑時, 會沿用已resolve之Promise而不再下載
-                    pmDownload = null
-
-                })
-        }
-        await pmDownload
-
-        //check
-        if (fsIsFile(`${fdBaseDL}${fnExe}`)) {
-            fdBase = fdBaseDL
-        }
-
-    }
-
-    //check
-    if (fdBase === '') {
-        return Promise.reject('can not find yt-dlp.exe')
-    }
-
-    //fpExeDlp
-    let fpExeDlp = path.resolve(fdBase, fnExe)
+    //fpExeDlp, 自動定位yt-dlp.exe, 無檔案則下載並驗證
+    let fpExeDlp = await ensureDlpExe()
 
     //fpExeFfmpeg, 調用w-ffmpeg之autoDownloadFiles自動定位ffmpeg.exe, 無檔案則由w-ffmpeg自行下載
     let { fpExe: fpExeFfmpeg } = await autoDownloadFilesFfmpeg()

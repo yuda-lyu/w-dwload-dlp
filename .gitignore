@@ -9,4 +9,5 @@ tmp
 .claude
 yt-dlp/Downloads
 yt-dlp/ffmpeg.exe
+yt-dlp/*.part
 test*.mp4
