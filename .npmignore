@@ -1,10 +1,4 @@
 node_modules
-yt-dlp/Downloads
-yt-dlp/ffmpeg.exe
-yt-dlp/yt-dlp.exe
-yt-dlp/manifest.json
-yt-dlp/*.part
-test/_tmp
 test*.mp4
 .agents
 .opencode
@@ -13,6 +7,12 @@ CLAUDE*.md
 AGENTS*.md
 .env
 tmp
+
+# 外部執行檔不入npm包, 只留bin/manifest.json(主幹模式之基準清單); 快取與測試暫存夾不入包(外部執行檔規格S1、S5)
+/bin/*
+!/bin/manifest.json
+/bin-cache/
+/test/_tmp/
 
 # 指引要求文件入 git 版控、不入 npm 包(2026-10-22)
 sgud

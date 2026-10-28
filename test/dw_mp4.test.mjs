@@ -1,6 +1,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import WDwloadDlp from '../src/WDwloadDlp.mjs'
+import { setupMirror } from './tools/dwMirror.mjs'
 
 
 function isWindows() {
@@ -14,6 +15,15 @@ describe('WDwloadDlp mp4', function() {
     if (!isWindows()) {
         return
     }
+
+    //yt-dlp.exe以本機鏡像供檔(經清單校驗), ffmpeg.exe由w-ffmpeg取得
+    let m = null
+    before(function() {
+        m = setupMirror('dwMp4')
+    })
+    after(function() {
+        m.restore()
+    })
 
     async function test() {
 
@@ -30,7 +40,6 @@ describe('WDwloadDlp mp4', function() {
 
         //WDwloadDlp
         await WDwloadDlp(url, fp, {
-            clean: true, //單一程序執行時, 事先清除之前暫存檔, 減少浪費硬碟空間
             funProg,
         })
 

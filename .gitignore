@@ -7,7 +7,7 @@ AGENTS*.md
 tmp
 .opencode
 .claude
-yt-dlp/Downloads
-yt-dlp/ffmpeg.exe
-yt-dlp/*.part
 test*.mp4
+
+# 外部執行檔之快取不入版控(外部執行檔規格S5)
+/bin-cache/
