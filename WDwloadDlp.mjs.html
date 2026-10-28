@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#autoDownloadFiles">autoDownloadFiles</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
     
 </nav>
 
@@ -45,7 +45,9 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import path from 'path'
+            <pre class="prettyprint source linenums"><code>import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import process from 'process'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
@@ -56,7 +58,6 @@ import sep from 'wsemi/src/sep.mjs'
 import strright from 'wsemi/src/strright.mjs'
 import strdelright from 'wsemi/src/strdelright.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
-import isbol from 'wsemi/src/isbol.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import cint from 'wsemi/src/cint.mjs'
@@ -64,14 +65,58 @@ import cdbl from 'wsemi/src/cdbl.mjs'
 import execProcess from 'wsemi/src/execProcess.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import fsCopyFile from 'wsemi/src/fsCopyFile.mjs'
-import fsCleanFolder from 'wsemi/src/fsCleanFolder.mjs'
-import fsDeleteFile from 'wsemi/src/fsDeleteFile.mjs'
-import autoDownloadFiles from './autoDownloadFiles.mjs'
+import fsDeleteFolder from 'wsemi/src/fsDeleteFolder.mjs'
+import fsDeleteFolderSafe from 'wsemi/src/fsDeleteFolderSafe.mjs'
+import WFfmpeg from 'w-ffmpeg'
+import ensureBins from './ensureBins.mjs'
 import parseDlpError from './parseDlpError.mjs'
+
+
+//fnExeDlp, fnExeFfmpeg, 外部執行檔名稱(清單bin/manifest.json與w-ffmpeg之清單所載)
+let fnExeDlp = 'yt-dlp.exe'
+let fnExeFfmpeg = 'ffmpeg.exe'
+
+//msStaleWork, 殘留工作夾之判定時間(ms)
+//每次呼叫皆在自己之工作夾內作業, 結束時(成功或失敗)即刪除, 逾此時間仍存在者必為行程崩潰或被強制結束所遺留, 於之後任一次呼叫開始時刪除;
+//取24小時是因其遠大於一般下載耗時, 使併行中之他呼叫(其工作夾修改時間較新)不致被誤刪, 又不令殘留檔久佔硬碟
+let msStaleWork = 24 * 60 * 60 * 1000
+
+//reWork, 工作夾名稱格式, 須與mkIdWork產生者一致; 清除殘留時只認此格式之資料夾, 不動os.tmpdir()/w-dwload-dlp/下的其他東西
+let reWork = /^\d{14}-[0-9A-Za-z]{6}$/
 
 
 function isWindows() {
     return process.platform === 'win32'
+}
+
+
+function mkIdWork() {
+    return `${now2strp()}-${genID(6)}`
+}
+
+
+//cleanStaleWork, 刪除fdRoot下修改時間逾msStaleWork之工作夾(僅名稱符合reWork之資料夾, 不跟進連結), 任何失敗(fdRoot不存在、他行程同時在刪、刪不掉)皆忽略, 不影響本次呼叫
+function cleanStaleWork(fdRoot) {
+    let vs = []
+    try {
+        vs = fs.readdirSync(fdRoot, { withFileTypes: true })
+    }
+    catch (err) {
+        return
+    }
+    let tNow = Date.now()
+    each(vs, (v) => {
+        if (!v.isDirectory() || !reWork.test(v.name)) {
+            return
+        }
+        let fd = path.join(fdRoot, v.name)
+        try {
+            if (tNow - fs.statSync(fd).mtimeMs > msStaleWork) {
+                fsDeleteFolder(fd) //不檢查錯誤, 刪不掉者留待之後的呼叫
+            }
+        }
+        catch (err) {}
+    })
 }
 
 
@@ -80,10 +125,15 @@ function isWindows() {
  *
  * yt-dlp: https://github.com/yt-dlp/yt-dlp
  *
+ * yt-dlp.exe與ffmpeg.exe不含於npm包，首次調用時經ensureBins依清單之SHA-256與大小校驗後取得(快取、鏡像或GitHub)，安裝時不下載；
+ * 部署前可預先調用WDwloadDlp.ensureBins()(yt-dlp.exe)與WFfmpeg.ensureBins()(ffmpeg.exe，見w-ffmpeg)，
+ * 離線與內網之用法(W_BIN_CACHE、W_BIN_MIRROR、W_BIN_OFFLINE)見README〈外部執行檔〉；
+ * 每次調用在作業系統暫存夾(os.tmpdir())下之w-dwload-dlp夾內，以時間加隨機id命名專用之工作夾內作業(下載、合併、轉檔之中介檔皆在其內)，結束時(成功或失敗)刪除該夾，結果檔複製到fp，
+ * 故多個調用可併行互不影響，不寫執行檔所在夾，也不切換工作路徑；每次調用開始時另刪除w-dwload-dlp/下修改時間逾24小時之殘留工作夾(行程崩潰或被強制結束所遺)
+ *
  * @param {String} url 輸入網址字串，支援網站種類詳見yt-dlp
  * @param {String} fp 輸入儲存video(*.mp4)檔案路徑字串
  * @param {Object} [opt={}] 輸入設定物件，預設{}
- * @param {Boolean} [opt.clean=false] 輸入預先清除暫存檔布林值，預設false
  * @param {Function} [opt.funProg=null] 輸入回傳進度函數，傳入參數為prog代表進度百分比、nn代表當前已下載ts檔案數量、na代表全部須下載ts檔案數量，預設null
  * @returns {Promise} 回傳Promise，resolve回傳成功訊息，reject回傳錯誤訊息字串，首行固定為`[代碼] 說明與處置`供調用方判斷錯誤類型，代碼可為osNotSupported、invalidUrl、exeNotReady、outputNotFound、copyFailed，以及yt-dlp執行失敗時由parseDlpError分類之unsupportedUrl、unavailable、sslFailed、dnsFailed、connectFailed、http403、http404、httpError、dlpFailed、execFailed，yt-dlp執行失敗時次行起依序為下載進度(有fragment資訊時)與yt-dlp之ERROR、WARNING原文
  * @example
@@ -110,7 +160,6 @@ function isWindows() {
  *
  *     //WDwloadDlp
  *     await WDwloadDlp(url, fp, {
- *         clean: true, //單一程序執行時, 事先清除之前暫存檔, 減少浪費硬碟空間
  *         funProg,
  *     })
  *
@@ -135,13 +184,6 @@ function isWindows() {
  */
 async function WDwloadDlp(url, fp, opt = {}) {
     let errTemp = null
-    let rc
-
-    //clean
-    let clean = get(opt, 'clean')
-    if (!isbol(clean)) {
-        clean = false
-    }
 
     //funProg
     let funProg = get(opt, 'funProg')
@@ -156,53 +198,63 @@ async function WDwloadDlp(url, fp, opt = {}) {
         return Promise.reject('[invalidUrl] url is not an effective string')
     }
 
-    //fpExeDlp, fpExeFfmpeg, 自動定位yt-dlp.exe與ffmpeg.exe, 無檔案(安裝時npm封鎖scripts致postinstall未執行)則自動下載
+    //fpExeDlp, fpExeFfmpeg, 經ensureBins取得yt-dlp.exe與ffmpeg.exe(快取、鏡像或GitHub, 皆依清單校驗), 首次使用才下載, 離線與內網之用法見README〈外部執行檔〉
     // fpExeDlp = `"${fpExeDlp}"` //用雙引號包住避免路徑有空格 //execProcess預設使用spawn不須雙引號括住
-    let exes = await autoDownloadFiles()
-        .catch((err) => {
-            errTemp = `[exeNotReady] can not prepare yt-dlp.exe or ffmpeg.exe, check the network for auto download\n${err}`
-        })
-    if (errTemp) {
+    //ffmpeg.exe由w-ffmpeg取得(其清單與快取), 須經WFfmpeg.ensureBins呼叫, 不可把w-ffmpeg之src/ensureBins.mjs打包進來(其套件根會指到本套件)
+    let fpExeDlp = ''
+    let fpExeFfmpeg = ''
+    try {
+        let binsDlp = await ensureBins({ names: fnExeDlp })
+        fpExeDlp = binsDlp[fnExeDlp]
+        let binsFfmpeg = await WFfmpeg.ensureBins({ names: fnExeFfmpeg })
+        fpExeFfmpeg = binsFfmpeg[fnExeFfmpeg]
+    }
+    catch (err) {
+        errTemp = `[exeNotReady] can not prepare yt-dlp.exe or ffmpeg.exe, check the network, or see the README (external executables) for W_BIN_CACHE, W_BIN_MIRROR and W_BIN_OFFLINE\n${get(err, 'code', 'E_ENSURE_BINS')} ${get(err, 'message', String(err))}`
         return Promise.reject(errTemp)
     }
-    let { fpExeDlp, fpExeFfmpeg } = exes
     // console.log('fpExeDlp', fpExeDlp)
     // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
-    //fdExe
-    let fdExe = path.dirname(fpExeDlp)
-    // console.log('fdExe', fdExe)
+    //fdRoot, 各次調用之工作夾的上層夾, 執行檔位於內容定址之快取夾(由清單校驗, 可能共用或唯讀), 故資料交換檔改寫作業系統暫存夾, 不寫執行檔所在夾
+    let fdRoot = path.join(os.tmpdir(), 'w-dwload-dlp')
+    // console.log('fdRoot', fdRoot)
 
-    //cwdOri, cwdTar
-    let cwdOri = process.cwd()
-    let cwdTar = fdExe
-    // console.log('process.cwd1', process.cwd())
+    //cleanStaleWork, 先清除崩潰殘留之舊工作夾
+    cleanStaleWork(fdRoot)
 
-    //chdir, 若不切換mseed2ascii預設輸出檔案是在工作路徑, 輸出檔變成會出現在專案下
-    process.chdir(cwdTar)
-    // console.log('process.cwd2', process.cwd())
+    //fdWork, 本次調用專用之工作夾, 由yt-dlp寫檔時自動建立, 不與其他調用共用, 故併行調用不會互相清掉對方下載中之檔
+    let fdWork = path.join(fdRoot, mkIdWork())
+    // console.log('fdWork', fdWork)
 
-    //id
-    let id = `${now2strp()}-${genID(6)}`
+    try {
+        return await dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork)
+    }
+    finally {
 
-    //fnAny
-    let fnAny = `${id}` //無副檔名
+        //刪除工作夾(含中介檔與失敗時的殘檔), 暫時被占用(例如防毒掃描)時重試, 仍刪不掉則忽略並留待之後調用的殘留清理, 不可讓清理失敗蓋過本次調用的結果
+        await fsDeleteFolderSafe(fdWork)
+            .catch(() => {})
 
-    //fdDownloads
-    let fdDownloads = path.resolve(fdExe, 'Downloads')
-    // console.log('fdDownloads', fdDownloads)
-
-    //clean
-    if (clean) {
-        fsCleanFolder(fdDownloads)
     }
 
+}
+
+
+//dwloadInWork, 於工作夾fdWork內執行yt-dlp下載, 並把結果檔複製到fp; 不負責建立與刪除工作夾
+async function dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork) {
+    let errTemp = null
+    let rc
+
+    //fnAny, 工作夾已唯一, 夾內檔名固定即可
+    let fnAny = 'dl' //無副檔名
+
     //fpInAny
-    let fpInAny = path.resolve(fdDownloads, fnAny)
+    let fpInAny = path.resolve(fdWork, fnAny)
     // console.log('fpInAny', fpInAny)
 
     //fpInMp4
-    let fpInMp4 = path.resolve(fdDownloads, `${id}.mp4`)
+    let fpInMp4 = path.resolve(fdWork, `${fnAny}.mp4`)
     // console.log('fpInMp4', fpInMp4)
 
     let fmts = []
@@ -446,9 +498,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
             errTemp = parseDlpError(stderr, { raw: String(err), nnf, naf })
         })
 
-    //chdir, 不論正常或錯誤皆需還原工作路徑
-    process.chdir(cwdOri)
-
     //check
     if (errTemp) {
         return Promise.reject(errTemp)
@@ -458,7 +507,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
     if (!fsIsFile(fpInMp4)) {
 
         //_fpInMp4, dlp針對某些mp4下載後會無法自動提供副檔名, 得再偵測無副檔名之檔案是否存在
-        let _fpInMp4 = path.resolve(fdDownloads, id)
+        let _fpInMp4 = path.resolve(fdWork, fnAny)
 
         //check
         if (!fsIsFile(_fpInMp4)) {
@@ -481,10 +530,6 @@ async function WDwloadDlp(url, fp, opt = {}) {
         return Promise.reject(`[copyFailed] can not copy the downloaded file to fp, check whether the folder exists and is writable\n${fpOut}\n${errTemp}`)
     }
 
-    //fsDeleteFile
-    rc = fsDeleteFile(fpInMp4)
-    //可能無檔案無法刪, 故不檢查錯誤
-
     //funProg
     if (bFunProg) {
         funProg(100, nnTotal, nnTotal)
@@ -492,6 +537,10 @@ async function WDwloadDlp(url, fp, opt = {}) {
 
     return 'ok'
 }
+
+
+//ensureBins, 部署前預先取得yt-dlp.exe, 以靜態屬性掛於主函數(主檔為default匯出, 不加具名匯出); ffmpeg.exe由WFfmpeg.ensureBins取得
+WDwloadDlp.ensureBins = ensureBins
 
 
 export default WDwloadDlp
@@ -509,7 +558,7 @@ export default WDwloadDlp
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 28 2026 01:55:51 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Thu Oct 29 2026 02:57:40 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

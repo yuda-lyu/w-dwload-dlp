@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#autoDownloadFiles">autoDownloadFiles</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
     
 </nav>
 
@@ -141,13 +141,18 @@
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>下載video檔案，預設轉mp4，核心調用yt-dlp，只能用於Windows作業系統</p>
-<p>yt-dlp: https://github.com/yt-dlp/yt-dlp</p></li></ul></dd>
+<p>yt-dlp: https://github.com/yt-dlp/yt-dlp</p>
+<p>yt-dlp.exe與ffmpeg.exe不含於npm包，首次調用時經ensureBins依清單之SHA-256與大小校驗後取得(快取、鏡像或GitHub)，安裝時不下載；
+部署前可預先調用WDwloadDlp.ensureBins()(yt-dlp.exe)與WFfmpeg.ensureBins()(ffmpeg.exe，見w-ffmpeg)，
+離線與內網之用法(W_BIN_CACHE、W_BIN_MIRROR、W_BIN_OFFLINE)見README〈外部執行檔〉；
+每次調用在作業系統暫存夾(os.tmpdir())下之w-dwload-dlp夾內，以時間加隨機id命名專用之工作夾內作業(下載、合併、轉檔之中介檔皆在其內)，結束時(成功或失敗)刪除該夾，結果檔複製到fp，
+故多個調用可併行互不影響，不寫執行檔所在夾，也不切換工作路徑；每次調用開始時另刪除w-dwload-dlp/下修改時間逾24小時之殘留工作夾(行程崩潰或被強制結束所遺)</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line89">line 89</a>
+        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line138">line 138</a>
     </li></ul></dd>
     
 
@@ -194,7 +199,7 @@
 
     <h5 class="h5-examples">Example</h5>
     
-    <pre class="prettyprint"><code>import fs from 'fs'import WDwloadDlp from './src/WDwloadDlp.mjs'async function test() {    //url    let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4` //youtube mp4    // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm    // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm    // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili    // let url = `https://ooo.mp4` //直接提供mp4檔    // let url = `https://cdn.jsdelivr.net/npm/w-demores/res/video/aigen_hls/playlist.m3u8`    //fp    let fp = './test.mp4'    //funProg    let funProg = (prog, nn, na) => {        console.log('prog', `${prog.toFixed(2)}%`, nn, na)    }    //WDwloadDlp    await WDwloadDlp(url, fp, {        clean: true, //單一程序執行時, 事先清除之前暫存檔, 減少浪費硬碟空間        funProg,    })    //len    let len = fs.statSync(fp).size    console.log('len', len)    console.log('done:', fp)}test()    .catch((err) => {        console.log('catch', err)    })// prog 0.49% 1 99// prog 5.05% 4 99// ...// prog 99.00% 98 99// prog 100.00% 99 99// len 22394508// done: ./test.mp4</code></pre>
+    <pre class="prettyprint"><code>import fs from 'fs'import WDwloadDlp from './src/WDwloadDlp.mjs'async function test() {    //url    let url = `https://www.youtube.com/watch?v=jfXg5ZslKg4` //youtube mp4    // let url = `https://www.youtube.com/watch?v=fTk0mc946dk` //youtube webm    // let url = `https://www.youtube.com/watch?v=lKoCiBVKQaQ` //youtube webm    // let url = `https://www.bilibili.com/video/BV1JZ421x7q8/?spm_id_from=333.1073.channel.secondary_floor_video.click` //bilibili    // let url = `https://ooo.mp4` //直接提供mp4檔    // let url = `https://cdn.jsdelivr.net/npm/w-demores/res/video/aigen_hls/playlist.m3u8`    //fp    let fp = './test.mp4'    //funProg    let funProg = (prog, nn, na) => {        console.log('prog', `${prog.toFixed(2)}%`, nn, na)    }    //WDwloadDlp    await WDwloadDlp(url, fp, {        funProg,    })    //len    let len = fs.statSync(fp).size    console.log('len', len)    console.log('done:', fp)}test()    .catch((err) => {        console.log('catch', err)    })// prog 0.49% 1 99// prog 5.05% 4 99// ...// prog 99.00% 98 99// prog 100.00% 99 99// len 22394508// done: ./test.mp4</code></pre>
 
 
 
@@ -363,46 +368,6 @@
 
         <tr>
             
-                <td class="name"><code>clean</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Boolean</span>
-
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    <code>false</code>
-                
-                </td>
-            
-
-            <td class="description last"><p>輸入預先清除暫存檔布林值，預設false</p></td>
-        </tr>
-
-    
-
-        <tr>
-            
                 <td class="name"><code>funProg</code></td>
             
 
@@ -496,7 +461,7 @@
 
     
 
-    <h4 class="name" id="autoDownloadFiles"><span class="type-signature type-signature-async">(async) </span>autoDownloadFiles<span class="signature">()</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id="ensureBins"><span class="type-signature"></span>ensureBins<span class="signature">(opt<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
 
     
 
@@ -506,21 +471,17 @@
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>自動定位yt-dlp.exe與ffmpeg.exe，若無檔案則自動下載，回傳各執行檔的絕對路徑</p>
-<p>yt-dlp.exe依序偵測當前工作路徑的yt-dlp/與node_modules/w-dwload-dlp/yt-dlp/，皆無時，
-代表安裝時npm封鎖scripts致postinstall未執行，故自動調用downloadFiles重新下載，
-下載時會取同一分支之yt-dlp/manifest.json核對SHA-256與大小，相符才落檔，不符則失敗且不留檔(見ensureDlpExe與downloadFiles)；
-既有之yt-dlp.exe直接採用，不重算雜湊、不連網</p>
-<p>ffmpeg.exe由w-ffmpeg之autoDownloadFiles負責偵測與下載，故基於本套件開發之套件或專案，
-僅須調用本函數即可備齊全部執行檔，無須各自再調用w-ffmpeg之autoDownloadFiles</p>
-<p>供w-dwload-dlp自身與其他依賴w-dwload-dlp的套件調用，無須各自實作偵測與下載邏輯</p>
-<p>因yt-dlp.exe與ffmpeg.exe只能用於Windows作業系統，故調用前須自行檢核作業系統</p></li></ul></dd>
+    <dd class="tag-description"><ul class="dummy"><li><p>取得本套件之外部執行檔yt-dlp.exe: 首次使用時自GitHub主幹(master)下載(或自鏡像取得)，以清單之SHA-256與大小校驗，之後自快取取得(亦校驗)</p>
+<p>本套件為主幹模式(mode為floating)：執行時先取GitHub主幹之bin/manifest.json，取不到或無效時用npm包內同路徑之基準清單，
+故yt-dlp.exe更新只須推GitHub，不須發布本套件(見README〈外部執行檔〉)</p>
+<p>規格: 外部執行檔之存放下載校驗與離線(制式規格)§6; 實作為wsemi之fsEnsureBins, 本套件不另寫下載、快取、鏡像、校驗
+環境變數: W_BIN_CACHE、W_BIN_MIRROR、W_BIN_OFFLINE, 見README〈外部執行檔〉</p></li></ul></dd>
     
 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="autoDownloadFiles.mjs.html">autoDownloadFiles.mjs</a>, <a href="autoDownloadFiles.mjs.html#line41">line 41</a>
+        <a href="ensureBins.mjs.html">ensureBins.mjs</a>, <a href="ensureBins.mjs.html#line38">line 38</a>
     </li></ul></dd>
     
 
@@ -567,18 +528,15 @@
 
     <h5 class="h5-examples">Example</h5>
     
-    <pre class="prettyprint"><code>import autoDownloadFiles from 'w-dwload-dlp/src/autoDownloadFiles.mjs'
+    <pre class="prettyprint"><code>import ensureBins from 'w-dwload-dlp/src/ensureBins.mjs'
 
 async function test() {
 
-    //autoDownloadFiles, 無yt-dlp.exe或ffmpeg.exe時自動下載, 下載失敗則reject
-    let { fpExeDlp, fpExeFfmpeg } = await autoDownloadFiles()
+    //部署前預先取得(連網機器設W_BIN_CACHE=&lt;資料夾>後執行, 該資料夾即可作為離線鏡像W_BIN_MIRROR)
+    let bins = await ensureBins()
 
-    console.log('fpExeDlp', fpExeDlp)
-    // fpExeDlp D:\xxx\node_modules\w-dwload-dlp\yt-dlp\yt-dlp.exe
-
-    console.log('fpExeFfmpeg', fpExeFfmpeg)
-    // fpExeFfmpeg D:\xxx\node_modules\w-ffmpeg\src\ffmpeg.exe
+    console.log('bins', bins)
+    // bins { 'yt-dlp.exe': 'D:\\xxx\\node_modules\\w-dwload-dlp\\bin-cache\\&lt;sha256>\\yt-dlp.exe' }
 }
 test()
     .catch((err) => {
@@ -586,6 +544,76 @@ test()
     })</code></pre>
 
 
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>opt</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>{}</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入設定物件, 交wsemi之fsEnsureBins(names、cacheDir、mirror、offline、onProgress等), pkgRoot固定為本套件根</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -606,7 +634,7 @@ test()
 
         
 <div class="param-desc">
-    <p>回傳Promise，resolve回傳執行檔路徑物件，內含fpExeDlp與fpExeFfmpeg兩絕對路徑字串，reject回傳錯誤訊息</p>
+    <p>回傳Promise，resolve回傳{ [檔名]: 絕對路徑 }，reject回傳帶code之Error(E_OFFLINE_MISSING、E_HASH_MISMATCH等)</p>
 </div>
 
 
@@ -1025,7 +1053,7 @@ console.log(parseDlpError(stderr, { nnf: 24, naf: 406 }))
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 28 2026 01:55:51 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Thu Oct 29 2026 02:57:40 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
