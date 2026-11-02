@@ -1,13 +1,13 @@
 {
   "name": "w-dwload-dlp",
-  "version": "1.0.54",
+  "version": "1.0.55",
   "main": "dist/w-dwload-dlp.umd.js",
   "dependencies": {
-    "w-ffmpeg": "^1.0.31",
-    "wsemi": "^1.9.37"
+    "w-ffmpeg": "^1.0.33",
+    "wsemi": "^1.9.45"
   },
   "devDependencies": {
-    "w-package-tools": "^1.1.21"
+    "w-package-tools": "^1.1.23"
   },
   "scripts": {
     "test": "mocha --parallel \"test/*.test.mjs\" --timeout 180000",
