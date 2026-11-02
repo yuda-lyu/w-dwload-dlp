@@ -14,6 +14,7 @@ function isWindows() {
 
 
 //規格: 外部執行檔之存放下載校驗與離線(制式規格) S1、S2、S5、M1、M2、M4、M5、D1、E2、§8 T1、T2
+//規格: 自有套件之npm發布範圍 原則1、2〈套件測試之npm包檢查〉(2026-11-02 使用者裁示A)、4
 describe(`bin/manifest.json`, function() {
     this.timeout(180000)
 
@@ -136,23 +137,53 @@ describe(`bin/manifest.json`, function() {
         assert.strict.equal(attr.trim().endsWith('binary: set'), true, attr)
     })
 
-    it(`should not pack external executables into the npm package, only bin/manifest.json (S1, S5, T1)`, function() {
-        //先放誘餌檔(缺忽略規則時確定性變紅): bin/、快取夾與測試暫存夾內各放探針檔, 測試平行執行時他檔之暫存檔亦不得影響本案
-        for (let fp of fnDecoys) {
-            fs.writeFileSync(fp, 'x')
+    //getPackFiles, 先放誘餌檔(缺忽略規則時確定性變紅)再取一次npm pack清單並快取, 各案共用: bin/、快取夾與測試暫存夾內各放探針檔, 測試平行執行時他檔之暫存檔亦不得影響本案
+    let packFiles = null
+    let getPackFiles = () => {
+        if (packFiles === null) {
+            for (let fp of fnDecoys) {
+                fs.writeFileSync(fp, 'x')
+            }
+            fs.mkdirSync(fdDecoy, { recursive: true })
+            fs.writeFileSync(`${fdDecoy}/yt-dlp.exe`, 'x')
+            fs.mkdirSync(fdt, { recursive: true })
+            fs.writeFileSync(`${fdt}/probe.exe`, 'x')
+            let r = JSON.parse(execSync('npm pack --dry-run --json', { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }))
+            let info = Array.isArray(r) ? r[0] : Object.values(r)[0] //npm 11以前為陣列, npm 12起為以套件名為鍵之物件
+            packFiles = info.files.map((v) => v.path)
         }
-        fs.mkdirSync(fdDecoy, { recursive: true })
-        fs.writeFileSync(`${fdDecoy}/yt-dlp.exe`, 'x')
-        fs.mkdirSync(fdt, { recursive: true })
-        fs.writeFileSync(`${fdt}/probe.exe`, 'x')
-        let r = JSON.parse(execSync('npm pack --dry-run --json', { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }))
-        let info = Array.isArray(r) ? r[0] : Object.values(r)[0] //npm 11以前為陣列, npm 12起為以套件名為鍵之物件
-        let fps = info.files.map((v) => v.path)
-        assert.strict.deepStrictEqual(fps.filter((v) => /\.(exe|dll|msi|zip|7z|\d{3})$/i.test(v)), [])
+        return packFiles
+    }
+
+    //listFiles, 列出資料夾內所有檔案(相對套件根, 正斜線)
+    let listFiles = (fd) => {
+        return fs.readdirSync(fd, { recursive: true })
+            .map((v) => `${fd}/${v}`.replace(/\\/g, '/'))
+            .filter((v) => fs.statSync(v).isFile())
+            .sort()
+    }
+
+    //規格: 自有套件之npm發布範圍 原則2〈套件測試之npm包檢查〉①「不得入包」只列外部執行檔與壓縮檔, bin/除manifest.json外之檔, CLAUDE*.md, tmp/, test/_tmp/, .env
+    it(`should not pack external executables, archives, other files of bin/, CLAUDE*.md, tmp/, test/_tmp/ nor .env into the npm package, only bin/manifest.json (S1, S5, T1; npm發布範圍 原則2 套件測試之npm包檢查 ①)`, function() {
+        let fps = getPackFiles()
+        assert.strict.deepStrictEqual(fps.filter((v) => /\.(exe|dll|node|msi|zip|7z|gz|tgz|\d{3})$/i.test(v)), [])
         assert.strict.deepStrictEqual(fps.filter((v) => v.startsWith('bin/') || v.startsWith('bin-cache/')), ['bin/manifest.json'])
         assert.strict.deepStrictEqual(fps.filter((v) => v.startsWith('yt-dlp/') || /(^|\/)yt-dlp\.exe$/.test(v)), []) //舊路徑檔不入包
-        assert.strict.deepStrictEqual(fps.filter((v) => v.startsWith('test/_tmp/') || v.startsWith('sgud/') || v.startsWith('scripts/')), [])
+        assert.strict.deepStrictEqual(fps.filter((v) => /(^|\/)CLAUDE[^/]*\.md$/.test(v)), [])
+        assert.strict.deepStrictEqual(fps.filter((v) => v.startsWith('tmp/') || v.startsWith('test/_tmp/') || /(^|\/)\.env$/.test(v)), [])
         assert.strict.equal(fps.includes('src/ensureBins.mjs'), true)
+        assert.strict.equal(fps.includes('bin/manifest.json'), true)
+    })
+
+    //規格: 自有套件之npm發布範圍 原則1、4 npm包＝git版控之內容, sgud/與test/tools/一律不排除; 原則2〈套件測試之npm包檢查〉②開發檔(sgud/、docs/、test/、toolg/、script.txt等)依原則1隨包, 不斷言其不在
+    it(`should pack sgud/ and test/tools/ into the npm package as git tracked content (npm發布範圍 原則1、4; 套件測試之npm包檢查 ②)`, function() {
+        let fps = getPackFiles()
+        let fpsSgud = listFiles('sgud')
+        assert.strict.equal(fpsSgud.includes('sgud/state/state.md'), true)
+        assert.strict.deepStrictEqual(fpsSgud.filter((v) => !fps.includes(v)), [], 'sgud/ files missing from the npm package')
+        let fpsTools = listFiles('test/tools')
+        assert.strict.equal(fpsTools.length > 0, true)
+        assert.strict.deepStrictEqual(fpsTools.filter((v) => !fps.includes(v)), [], 'test/tools/ files missing from the npm package')
     })
 
 })

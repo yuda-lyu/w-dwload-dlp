@@ -1,15 +1,17 @@
 node_modules
-test*.mp4
+test/_tmp
 .agents
-.opencode
-.claude
 CLAUDE*.md
 AGENTS*.md
 .env
 tmp
+.opencode
+.claude
+test*.mp4
 
-# 外部執行檔不入npm包, 只留bin/manifest.json(主幹模式之基準清單); 快取與測試暫存夾不入包(外部執行檔規格S1、S5)
+# 外部執行檔之快取不入版控(外部執行檔規格S5)
+/bin-cache/
+
+# [npm發布範圍 原則2 第1條 外部執行檔與其附屬] 外部執行檔不入npm包, 只留bin/manifest.json(主幹模式之基準清單; 外部執行檔規格S1、S5; dspec 自有套件之npm發布範圍)
 /bin/*
 !/bin/manifest.json
-/bin-cache/
-/test/_tmp/

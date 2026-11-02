@@ -6,14 +6,15 @@
 
 - **規格**:`C:\opensrcOper\dspec\外部執行檔之存放下載校驗與離線.md`(制式規格;本套件為 A 類、**主幹模式**,登記於主控帳本 G10;wsemi `fsEnsureBins` 為共用實作).本節只摘要,細節以該檔為準.
 - **規則**:
-  1. 外部執行檔(`yt-dlp.exe`)放自家 repo 之 `bin/`,納入 git,**不入 npm 包**(`.npmignore`:`/bin/*`、`!/bin/manifest.json`、`/bin-cache/`、`/test/_tmp/`);快取 `bin-cache/` 不入版控與 npm 包;`.gitattributes` 設 `bin/** binary`.
+  1. 外部執行檔(`yt-dlp.exe`)放自家 repo 之 `bin/`,納入 git,**不入 npm 包**(`.npmignore`:首段完整抄錄 `.gitignore`〔含 `/bin-cache/`、`test/_tmp`〕,其後第 1 條排除項 `/bin/*`、`!/bin/manifest.json`,依 dspec〈自有套件之npm發布範圍〉原則 3);快取 `bin-cache/` 不入版控與 npm 包;`.gitattributes` 設 `bin/** binary`.
   2. 清單 `bin/manifest.json`(制式 schema 1,`mode: "floating"`,不帶 `commit`,`version` 為 yt-dlp 版本)由 `toolg/genBinManifest.mjs` 依 `bin/` 實檔產生,**不手寫**.
   3. 套件端只做三件事:提供清單、經 `src/ensureBins.mjs` 轉呼叫 wsemi `fsEnsureBins` 取得路徑後啟動、匯出 `ensureBins`(主檔為 default 匯出,故掛為靜態屬性 `WDwloadDlp.ensureBins`,不加具名匯出);**不得自寫下載、快取、校驗、鏡像**,不得 `postinstall` 下載;不轉傳使用者之 `floatingManifestUrl`.
   4. `ffmpeg.exe` 屬 `w-ffmpeg`,一律經 `WFfmpeg.ensureBins({ names: 'ffmpeg.exe' })` 取得(**不可**把 `w-ffmpeg/src/ensureBins.mjs` 打包進本套件 UMD:其套件根會指到本套件;故 `w-ffmpeg` 列 rollup external).
   5. 環境變數 `W_BIN_CACHE`、`W_BIN_MIRROR`、`W_BIN_OFFLINE` 由 `fsEnsureBins` 統一讀取;README〈外部執行檔〉說明用法與離線部署.
-- **盤點指令**:`node C:/opensrcOper/tools/scan-bins.mjs --only w-dwload-dlp`(應為 OK);`npm pack --dry-run`(清單只有 `bin/manifest.json`).
+  6. npm 包檢查(dspec〈自有套件之npm發布範圍〉原則 1、4,原則 2〈套件測試之 npm 包檢查〉,2026-11-02 使用者裁示 A):①「不得入包」只列外部執行檔與壓縮檔(`.exe .dll .node .msi .zip .7z .gz .tgz` 與分片 `.NNN`)、`bin/` 除 `manifest.json` 外之檔、`CLAUDE*.md`、`tmp/`、`test/_tmp/`、`.env`;②`sgud/`、`docs/`、`test/`、`toolg/`、`script.txt` 等 git 版控內容隨包,**測試不得斷言其不在**,反須斷言 `sgud/`(至少 `sgud/state/state.md`)與 `test/tools/` 隨包.本套件原無大小上限斷言;若要加,只計 `src/`、`dist/`、`bin/`(現值總和 357159 位元組、最大單檔 193265).
+- **盤點指令**:`node C:/opensrcOper/tools/scan-bins.mjs --only w-dwload-dlp`(應為 OK);`npm pack --dry-run`(`bin/` 只有 `bin/manifest.json`,`sgud/` 3 檔隨包).
 - **站點全集**:取得 `yt-dlp.exe` 之站點 1 處(`src/WDwloadDlp.mjs` 經 `ensureBins`)＋對外 `ensureBins` 2 條路徑(`WDwloadDlp.ensureBins`、深層匯入 `src/ensureBins.mjs`);取得 `ffmpeg.exe` 之站點 1 處(`WFfmpeg.ensureBins`);啟動外部程式之站點 1 處(`execProcess(fpExeDlp, …)`);全已套.
-- **把關測試**:`test/unit-binManifest.test.mjs`(M1/M2/M4/T1/T2:清單形態、與 `bin/` 實檔一致、版本與 `yt-dlp.exe --version` 一致、清單即工具所產、`.npmignore` 含誘餌檔之 `npm pack`、`.gitignore`/`.gitattributes`、src 無自寫下載、無 postinstall、相依版本、rollup external、主檔匯出形態、README 節);`test/api-ensureBins.test.mjs`(T3~T8:本機 HTTP 伺服器扮 GitHub 原始檔、本地資料夾扮鏡像與快取;主函數類入口攔截全域 `fetch` 並攔截 `child_process.spawn` 斷言啟動者為 `ensureBins` 回傳之路徑、套件根與 cwd 無關、不轉傳 `floatingManifestUrl`).功能測試 `test/dw_mp4.test.mjs`、`dw_m3u8.test.mjs` 以本機鏡像(`test/tools/dwMirror.mjs`)供 `yt-dlp.exe`,實際連 YouTube.
+- **把關測試**:`test/unit-binManifest.test.mjs`(M1/M2/M4/T1/T2:清單形態、與 `bin/` 實檔一致、版本與 `yt-dlp.exe --version` 一致、清單即工具所產、含誘餌檔之 `npm pack`〔①不得入包、②`sgud/` 與 `test/tools/` 隨包,各一案〕、`.gitignore`/`.gitattributes`、src 無自寫下載、無 postinstall、相依版本、rollup external、主檔匯出形態、README 節);`test/api-ensureBins.test.mjs`(T3~T8:本機 HTTP 伺服器扮 GitHub 原始檔、本地資料夾扮鏡像與快取;主函數類入口攔截全域 `fetch` 並攔截 `child_process.spawn` 斷言啟動者為 `ensureBins` 回傳之路徑、套件根與 cwd 無關、不轉傳 `floatingManifestUrl`).功能測試 `test/dw_mp4.test.mjs`、`dw_m3u8.test.mjs` 以本機鏡像(`test/tools/dwMirror.mjs`)供 `yt-dlp.exe`,實際連 YouTube.
 - **執行指令**:`node node_modules/mocha/bin/mocha.js --no-parallel test/unit-binManifest.test.mjs test/api-ensureBins.test.mjs --timeout 180000`(約 10 秒).
 
 ## R2 換 `bin/yt-dlp.exe` 必同步重產 `bin/manifest.json`,兩者同一提交推 GitHub master
