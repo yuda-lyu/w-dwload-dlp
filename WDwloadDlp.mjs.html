@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#dwloadSubtitle">dwloadSubtitle</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li><li><a href="global.html#parseSubJson3">parseSubJson3</a></li><li><a href="global.html#pickSubTrack">pickSubTrack</a></li></ul>
     
 </nav>
 
@@ -52,6 +52,9 @@ import process from 'process'
 import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
 import each from 'lodash-es/each.js'
+import every from 'lodash-es/every.js'
+import isArray from 'lodash-es/isArray.js'
+import isPlainObject from 'lodash-es/isPlainObject.js'
 import genID from 'wsemi/src/genID.mjs'
 import now2strp from 'wsemi/src/now2strp.mjs'
 import sep from 'wsemi/src/sep.mjs'
@@ -70,6 +73,8 @@ import fsDeleteFolderSafe from 'wsemi/src/fsDeleteFolderSafe.mjs'
 import WFfmpeg from 'w-ffmpeg'
 import ensureBins from './ensureBins.mjs'
 import parseDlpError from './parseDlpError.mjs'
+import pickSubTrack from './pickSubTrack.mjs'
+import parseSubJson3 from './parseSubJson3.mjs'
 
 
 //fnExeDlp, fnExeFfmpeg, 外部執行檔名稱(清單bin/manifest.json與w-ffmpeg之清單所載)
@@ -120,6 +125,34 @@ function cleanStaleWork(fdRoot) {
 }
 
 
+//runInWork, 於本次調用專用之工作夾內執行fun(fdWork), 結束時(成功或失敗)刪除工作夾; WDwloadDlp與dwloadSubtitle共用, 工作夾之建名、刪除、殘留清理各僅1處(規則R3)
+async function runInWork(fun) {
+
+    //fdRoot, 各次調用之工作夾的上層夾, 執行檔位於內容定址之快取夾(由清單校驗, 可能共用或唯讀), 故資料交換檔改寫作業系統暫存夾, 不寫執行檔所在夾
+    let fdRoot = path.join(os.tmpdir(), 'w-dwload-dlp')
+    // console.log('fdRoot', fdRoot)
+
+    //cleanStaleWork, 先清除崩潰殘留之舊工作夾
+    cleanStaleWork(fdRoot)
+
+    //fdWork, 本次調用專用之工作夾, 由yt-dlp寫檔時自動建立, 不與其他調用共用, 故併行調用不會互相清掉對方下載中之檔
+    let fdWork = path.join(fdRoot, mkIdWork())
+    // console.log('fdWork', fdWork)
+
+    try {
+        return await fun(fdWork)
+    }
+    finally {
+
+        //刪除工作夾(含中介檔與失敗時的殘檔), 暫時被占用(例如防毒掃描)時重試, 仍刪不掉則忽略並留待之後調用的殘留清理, 不可讓清理失敗蓋過本次調用的結果
+        await fsDeleteFolderSafe(fdWork)
+            .catch(() => {})
+
+    }
+
+}
+
+
 /**
  * 下載video檔案，預設轉mp4，核心調用yt-dlp，只能用於Windows作業系統
  *
@@ -131,7 +164,7 @@ function cleanStaleWork(fdRoot) {
  * 每次調用在作業系統暫存夾(os.tmpdir())下之w-dwload-dlp夾內，以時間加隨機id命名專用之工作夾內作業(下載、合併、轉檔之中介檔皆在其內)，結束時(成功或失敗)刪除該夾，結果檔複製到fp，
  * 故多個調用可併行互不影響，不寫執行檔所在夾，也不切換工作路徑；每次調用開始時另刪除w-dwload-dlp/下修改時間逾24小時之殘留工作夾(行程崩潰或被強制結束所遺)
  *
- * @param {String} url 輸入網址字串，支援網站種類詳見yt-dlp
+ * @param {String} url 輸入網址字串，支援網站種類詳見yt-dlp；以-開頭之字串亦視為網址，不會被當成yt-dlp選項
  * @param {String} fp 輸入儲存video(*.mp4)檔案路徑字串
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Function} [opt.funProg=null] 輸入回傳進度函數，傳入參數為prog代表進度百分比、nn代表當前已下載ts檔案數量、na代表全部須下載ts檔案數量，預設null
@@ -216,27 +249,9 @@ async function WDwloadDlp(url, fp, opt = {}) {
     // console.log('fpExeDlp', fpExeDlp)
     // console.log('fpExeFfmpeg', fpExeFfmpeg)
 
-    //fdRoot, 各次調用之工作夾的上層夾, 執行檔位於內容定址之快取夾(由清單校驗, 可能共用或唯讀), 故資料交換檔改寫作業系統暫存夾, 不寫執行檔所在夾
-    let fdRoot = path.join(os.tmpdir(), 'w-dwload-dlp')
-    // console.log('fdRoot', fdRoot)
-
-    //cleanStaleWork, 先清除崩潰殘留之舊工作夾
-    cleanStaleWork(fdRoot)
-
-    //fdWork, 本次調用專用之工作夾, 由yt-dlp寫檔時自動建立, 不與其他調用共用, 故併行調用不會互相清掉對方下載中之檔
-    let fdWork = path.join(fdRoot, mkIdWork())
-    // console.log('fdWork', fdWork)
-
-    try {
-        return await dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork)
-    }
-    finally {
-
-        //刪除工作夾(含中介檔與失敗時的殘檔), 暫時被占用(例如防毒掃描)時重試, 仍刪不掉則忽略並留待之後調用的殘留清理, 不可讓清理失敗蓋過本次調用的結果
-        await fsDeleteFolderSafe(fdWork)
-            .catch(() => {})
-
-    }
+    return runInWork((fdWork) => {
+        return dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork)
+    })
 
 }
 
@@ -485,7 +500,8 @@ async function dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork) {
     //cmdDl
     // let cmdDl = `"${url}" -o "${fpInAny}" --newline --merge-output-format "mp4"`
     //--encoding utf-8, yt-dlp於Windows預設以系統字碼頁輸出, 與execProcess預設之utf-8解碼不符, 致路徑與系統錯誤訊息之中文成亂碼
-    let cmdDl = [url, '-o', fpInAny, '--newline', '--no-playlist', '--merge-output-format', 'mp4', '--ffmpeg-location', fpExeFfmpeg, '--encoding', 'utf-8'] //execProcess預設使用spawn不須雙引號括住
+    //--, 其後一律視為網址; url以-開頭時(例如'--version'、'--exec=...')若不隔開會被yt-dlp當成選項(選項注入), 故url須置於--之後
+    let cmdDl = ['-o', fpInAny, '--newline', '--no-playlist', '--merge-output-format', 'mp4', '--ffmpeg-location', fpExeFfmpeg, '--encoding', 'utf-8', '--', url] //execProcess預設使用spawn不須雙引號括住
     // console.log('cmdDl', cmdDl)
 
     //execProcess
@@ -539,8 +555,245 @@ async function dwloadInWork(url, fp, funProg, fpExeDlp, fpExeFfmpeg, fdWork) {
 }
 
 
+//langsDef, opt.langs之預設值(沿用fetch-youtube-transcript技能之偏好序, 偏中文)
+let langsDef = ['zh-TW', 'zh-Hant', 'zh', 'en']
+
+//bWarnedLangs, opt.langs之非預期輸入警告每個行程只輸出1次
+let bWarnedLangs = false
+
+
+//parseLangs, 讀取opt.langs, 種類為非空字串或非空字串之非空陣列(前後空白會去除, 去除後為空者視為非空字串以外); 未給或非預期之輸入改用預設, 不改寫呼叫端之opt; opt.debug為true時另輸出警告, 警告不含傳入之值
+//註: 規格(輸入參數之檢測機制 K1、§7)要求由wsemi共用檢測函數宣告種類, 但wsemi現無「字串或字串陣列」種類之公開函數, 故暫為手寫, wsemi日後有對應函數時改用
+function parseLangs(opt) {
+    let v = null
+    let debug = false
+    let funLog = null
+    try {
+        v = get(opt, 'langs')
+        debug = get(opt, 'debug') === true
+        funLog = get(opt, 'funLog')
+    }
+    catch (err) {
+        return [...langsDef] //opt不可讀(存取器拋錯、已撤銷之Proxy)視為未給
+    }
+    if (v === undefined || v === null) {
+        return [...langsDef]
+    }
+    let isLang = (s) => {
+        return typeof s === 'string' &amp;&amp; s.trim() !== ''
+    }
+    if (isLang(v)) {
+        return [v.trim()]
+    }
+    if (isArray(v) &amp;&amp; v.length > 0 &amp;&amp; every(v, isLang)) {
+        return v.map((s) => s.trim())
+    }
+    if (debug &amp;&amp; !bWarnedLangs) {
+        bWarnedLangs = true
+        let msg = `[w-dwload-dlp dwloadSubtitle] invalid opt.langs: must be a non-empty string or an array of non-empty strings, using default ${langsDef.join(',')}`
+        if (isfun(funLog)) {
+            funLog(msg, { fn: 'dwloadSubtitle', reason: 'invalid', key: 'opt.langs' })
+        }
+        else {
+            console.warn(msg)
+        }
+    }
+    return [...langsDef]
+}
+
+
+//runDlp, 執行yt-dlp, 成功回傳null, 失敗回傳parseDlpError分類後之錯誤訊息字串; execProcess不同步拋錯且reject皆為字串(含無法啟動子程序)
+async function runDlp(fpExeDlp, args) {
+    let errTemp = null
+
+    //stderr, yt-dlp之ERROR與WARNING皆輸出於stderr, 收集供失敗時提取錯誤
+    let stderr = ''
+    let cbStderr = (msg) => {
+        stderr += msg
+    }
+
+    //execProcess, 預設使用spawn不須雙引號括住; 不設逾時, 與WDwloadDlp相同(yt-dlp自有20秒之socket讀取逾時, 但對方持續少量送出資料時不會逾時, 見README〈下載字幕〉)
+    await execProcess(fpExeDlp, args, { cbStderr })
+        .catch((err) => {
+            errTemp = parseDlpError(stderr, { raw: String(err) })
+        })
+
+    return errTemp
+}
+
+
+/**
+ * 下載字幕(不下載影片)，核心調用yt-dlp，只能用於Windows作業系統，目前支援提供json3字幕軌之網站(YouTube)，不需瀏覽器與登入，也不需ffmpeg.exe
+ *
+ * 先取得影片資訊與字幕軌清單，依語言偏好挑選1軌後，再由yt-dlp下載該軌之json3字幕並解析；挑選規則見pickSubTrack：
+ * 有手動字幕時只從手動字幕挑(任何語言之手動字幕皆優先於自動字幕)，否則從自動字幕挑，自動字幕中語言相符者先取非機器翻譯者
+ *
+ * yt-dlp.exe之取得、工作夾之建立與刪除皆與WDwloadDlp相同，併行調用互不影響；結果不寫檔，由呼叫端自行處理；
+ * 與WDwloadDlp相同不設整體逾時：yt-dlp預設20秒無回應即放棄，但對方持續少量送出資料時可能無限等待，需要時請由呼叫端自行設定逾時；
+ * YouTube對字幕下載會限流(HTTP 429，機器翻譯軌尤甚)，本函數不重試，reject為httpError，訊息含原文
+ *
+ * @param {String} url 輸入單一影片之網址字串，播放清單或頻道頁網址將reject；以-開頭之字串亦視為網址，不會被當成yt-dlp選項
+ * @param {Object} [opt={}] 輸入設定物件，預設{}
+ * @param {String|Array} [opt.langs=['zh-TW','zh-Hant','zh','en']] 輸入偏好語言，為非空字串或非空字串之非空陣列，依序比對語言代碼(大小寫不分，先比完全相同，再比語言前綴，例如'zh'可中'zh-Hans')，非預期之輸入改用預設
+ * @param {Boolean} [opt.debug=false] 輸入是否於opt.langs為非預期之輸入時輸出警告，須為true才生效，警告不含傳入之值，同一行程只警告一次，預設false
+ * @param {Function} [opt.funLog=null] 輸入警告輸出函數，格式為(msg, { fn, reason, key })=>{}，未給則用console.warn，預設null
+ * @returns {Promise} 回傳Promise，resolve回傳物件，含url、videoId、title、channel、uploadDate(YYYYMMDD)、durationString、description、language(所挑字幕軌之語言代碼)、languageName、kind('manual'為手動字幕，'asr'為自動字幕)、translated(是否為YouTube機器翻譯之布林值，無原文軌而無從判定者為false)、availableTracks(挑選範圍內之全部字幕軌，每項為{ languageCode, name, kind })、segments(字幕段落，每項為{ tMs, t, txt })、segmentsCount、plainText(各段落之txt以換行串接，不去除連續相同之行)、timestampedText；reject回傳錯誤訊息字串，首行固定為`[代碼] 說明與處置`，代碼可為osNotSupported、invalidUrl(非字串、空字串，或為播放清單、頻道頁)、exeNotReady、noSubtitle(無可用字幕軌)、outputNotFound、invalidOutput(輸出檔無法讀取、內容無法解析或無文字)，以及yt-dlp執行失敗時由parseDlpError分類者
+ * @example
+ * import fs from 'fs'
+ * import WDwloadDlp from './src/WDwloadDlp.mjs'
+ *
+ * async function test() {
+ *
+ *     let url = `https://www.youtube.com/watch?v=TXcnAHNA0RU`
+ *
+ *     let r = await WDwloadDlp.dwloadSubtitle(url)
+ *     console.log(r.language, r.kind, r.segmentsCount)
+ *     console.log(r.segments[0])
+ *
+ *     fs.writeFileSync('./subtitle.json', JSON.stringify(r, null, 2), 'utf8')
+ * }
+ * test()
+ *     .catch((err) => {
+ *         console.log('catch', err)
+ *     })
+ * // zh-Hans manual 355
+ * // { tMs: 133, t: '00:00', txt: '大家好，这里是最佳拍档，我是大飞' }
+ *
+ */
+async function dwloadSubtitle(url, opt = {}) {
+
+    //isWindows
+    if (!isWindows()) {
+        return Promise.reject('[osNotSupported] operating system is not windows')
+    }
+
+    //check, 只收原始字串(交給spawn), 且不得為空白
+    if (typeof url !== 'string' || url.trim() === '') {
+        return Promise.reject('[invalidUrl] url is not an effective string')
+    }
+
+    //langs
+    let langs = parseLangs(opt)
+
+    //fpExeDlp, 只下載字幕不須合併或轉檔, 故不取ffmpeg.exe
+    let fpExeDlp = ''
+    try {
+        let binsDlp = await ensureBins({ names: fnExeDlp })
+        fpExeDlp = binsDlp[fnExeDlp]
+    }
+    catch (err) {
+        return Promise.reject(`[exeNotReady] can not prepare yt-dlp.exe, check the network, or see the README (external executables) for W_BIN_CACHE, W_BIN_MIRROR and W_BIN_OFFLINE\n${get(err, 'code', 'E_ENSURE_BINS')} ${get(err, 'message', String(err))}`)
+    }
+
+    return runInWork((fdWork) => {
+        return dwloadSubtitleInWork(url, langs, fpExeDlp, fdWork)
+    })
+
+}
+
+
+//dwloadSubtitleInWork, 於工作夾fdWork內執行yt-dlp取得影片資訊與字幕; 不負責建立與刪除工作夾
+async function dwloadSubtitleInWork(url, langs, fpExeDlp, fdWork) {
+    let errTemp = null
+
+    //fpBase, 工作夾已唯一, 夾內檔名固定即可
+    let fpBase = path.resolve(fdWork, 'dl')
+
+    //cmdCommon, --encoding utf-8原因同dwloadInWork
+    let cmdCommon = ['-o', fpBase, '--skip-download', '--newline', '--no-playlist', '--encoding', 'utf-8']
+
+    //第1次執行, 取得影片資訊與字幕軌清單;
+    //--flat-playlist使播放清單與頻道頁網址不逐一解析清單內之影片, --playlist-items 1再限制只列舉第1項(否則仍須逐頁列舉全部項目才得知是清單, 項目多者耗時), 兩者皆不影響單一影片;
+    //--之後一律視為網址, 避免url以-開頭時被當成yt-dlp之選項
+    errTemp = await runDlp(fpExeDlp, [...cmdCommon, '--write-info-json', '--flat-playlist', '--playlist-items', '1', '--', url])
+    if (errTemp) {
+        return Promise.reject(errTemp)
+    }
+
+    //fpInfo
+    let fpInfo = `${fpBase}.info.json`
+    if (!fsIsFile(fpInfo)) {
+        return Promise.reject('[outputNotFound] yt-dlp finished but the video information file can not be found')
+    }
+
+    //info
+    let info = null
+    try {
+        info = JSON.parse(fs.readFileSync(fpInfo, 'utf8'))
+    }
+    catch (err) {
+        return Promise.reject(`[invalidOutput] can not read or parse the video information file\n${get(err, 'message', String(err))}`)
+    }
+    if (!isPlainObject(info)) {
+        return Promise.reject('[invalidOutput] the video information file is not an object')
+    }
+
+    //check playlist, 單一影片之_type為'video'(舊版可能無此欄); 播放清單為'playlist', 多影片頁面為'multi_video'
+    let type = get(info, '_type')
+    if (type !== undefined &amp;&amp; type !== 'video') {
+        return Promise.reject('[invalidUrl] url is a playlist or channel page, pass the url of a single video')
+    }
+
+    //pickSubTrack
+    let picked = pickSubTrack(info, langs)
+    if (picked === null) {
+        return Promise.reject('[noSubtitle] video has no subtitle track in json3 format')
+    }
+    let { track, translated, tracks } = picked
+
+    //第2次執行, 以已取得之影片資訊下載所挑之字幕軌(不重新解析影片); 字幕軌限定json3, 無json3之軌已於pickSubTrack排除(yt-dlp遇無json3者不報錯而改下載其他格式, 離開碼仍為0);
+    //語言代碼已於pickSubTrack限定為英數字、底線與連字號, 作為--sub-langs之值(yt-dlp視為正規式)時只會精確比對該軌
+    let flagWrite = track.kind === 'manual' ? '--write-subs' : '--write-auto-subs'
+    errTemp = await runDlp(fpExeDlp, [...cmdCommon, '--load-info-json', fpInfo, flagWrite, '--sub-langs', track.languageCode, '--sub-format', 'json3'])
+    if (errTemp) {
+        return Promise.reject(errTemp)
+    }
+
+    //fpSub
+    let fpSub = `${fpBase}.${track.languageCode}.json3`
+    if (!fsIsFile(fpSub)) {
+        return Promise.reject('[outputNotFound] yt-dlp finished but the subtitle file can not be found')
+    }
+
+    //segments
+    let strSub = ''
+    try {
+        strSub = fs.readFileSync(fpSub, 'utf8')
+    }
+    catch (err) {
+        return Promise.reject(`[invalidOutput] can not read the subtitle file\n${get(err, 'message', String(err))}`)
+    }
+    let segments = parseSubJson3(strSub)
+    if (size(segments) === 0) {
+        return Promise.reject('[invalidOutput] subtitle file can not be parsed or has no text')
+    }
+
+    return {
+        url,
+        videoId: get(info, 'id', ''),
+        title: get(info, 'title', ''),
+        channel: get(info, 'channel', ''),
+        uploadDate: get(info, 'upload_date', ''),
+        durationString: get(info, 'duration_string', ''),
+        description: get(info, 'description', ''),
+        language: track.languageCode,
+        languageName: track.name,
+        kind: track.kind,
+        translated,
+        availableTracks: tracks,
+        segments,
+        segmentsCount: segments.length,
+        plainText: segments.map((s) => s.txt).join('\n'),
+        timestampedText: segments.map((s) => `[${s.t}] ${s.txt}`).join('\n'),
+    }
+}
+
+
 //ensureBins, 部署前預先取得yt-dlp.exe, 以靜態屬性掛於主函數(主檔為default匯出, 不加具名匯出); ffmpeg.exe由WFfmpeg.ensureBins取得
 WDwloadDlp.ensureBins = ensureBins
+
+//dwloadSubtitle, 下載字幕, 同上以靜態屬性掛於主函數
+WDwloadDlp.dwloadSubtitle = dwloadSubtitle
 
 
 export default WDwloadDlp
@@ -558,7 +811,7 @@ export default WDwloadDlp
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Nov 04 2026 16:34:22 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Nov 04 2026 21:39:21 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
