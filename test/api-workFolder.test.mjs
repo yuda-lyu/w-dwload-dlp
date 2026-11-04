@@ -72,7 +72,10 @@ describe(`work folder of each call`, function() {
 
     //workOf, 該次呼叫啟動yt-dlp時之輸出資料夾(-o之上層), 即該次呼叫之工作夾
     let workOf = (url) => {
-        let c = spawnCalls.find((v) => v.args[0] === url)
+        let c = spawnCalls.find((v) => {
+            let i = v.args.indexOf('--') //url在--之後(規則R5)
+            return i >= 0 && v.args[i + 1] === url
+        })
         assert.strict.notEqual(c, undefined, `yt-dlp was not started for ${url}`)
         return path.dirname(path.resolve(c.args[c.args.indexOf('-o') + 1]))
     }

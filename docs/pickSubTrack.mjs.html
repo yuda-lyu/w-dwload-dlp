@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>pickSubTrack.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#dwloadSubtitle">dwloadSubtitle</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li><li><a href="global.html#parseSubJson3">parseSubJson3</a></li><li><a href="global.html#pickSubTrack">pickSubTrack</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">pickSubTrack.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import get from 'lodash-es/get.js'
+import find from 'lodash-es/find.js'
+import filter from 'lodash-es/filter.js'
+import isArray from 'lodash-es/isArray.js'
+import isString from 'lodash-es/isString.js'
+import isPlainObject from 'lodash-es/isPlainObject.js'
+
+
+//reOrig, yt-dlp之自動字幕軌中原文軌之語言代碼後綴(例如ko-orig), 同清單內其他語言(原文語言本身除外)為YouTube機器翻譯
+let reOrig = /-orig$/
+
+//reLang, 可挑選之語言代碼格式; 語言代碼會作為--sub-langs之值(yt-dlp視為正規式, 且以-開頭者視為排除)與輸出檔名之一部分, 故只收英數字、底線、連字號且以英數字開頭, 其餘不列(YouTube之代碼如zh-Hans、ko-orig、en-uYU-mmqFLq8皆符合)
+let reLang = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+
+
+//listTracks, 由yt-dlp之字幕字典(subtitles或automatic_captions)列出有json3格式之字幕軌
+//各軌之第1筆格式可能無name(yt-dlp 2026.10.26實測自動軌首筆為無name之vtt), 故name取自json3該筆; 無json3者(例如live_chat、僅有vtt者)無法解析故不列
+function listTracks(dict, kind) {
+    let tracks = []
+    if (!isPlainObject(dict)) {
+        return tracks
+    }
+    for (let languageCode of Object.keys(dict)) {
+        if (!reLang.test(languageCode)) {
+            continue
+        }
+        let fmts = dict[languageCode]
+        let fmt = find(isArray(fmts) ? fmts : [], (f) => {
+            return get(f, 'ext') === 'json3'
+        })
+        if (!fmt) {
+            continue
+        }
+        let name = get(fmt, 'name', '')
+        tracks.push({ languageCode, name: isString(name) ? name : '', kind })
+    }
+    return tracks
+}
+
+
+//findByLangs, 依langs之順序找字幕軌, 同一語言先比完全相同, 再比語言前綴(例如zh可中zh-Hans, zh-TW可中zh), 大小寫不分
+function findByLangs(tracks, langs) {
+    for (let lang of langs) {
+        if (!isString(lang) || lang === '') {
+            continue
+        }
+        let want = lang.toLowerCase()
+        let exact = find(tracks, (t) => {
+            return t.languageCode.toLowerCase() === want
+        })
+        if (exact) {
+            return exact
+        }
+        let near = find(tracks, (t) => {
+            let code = t.languageCode.toLowerCase()
+            return code.startsWith(`${want}-`) || want.startsWith(`${code}-`)
+        })
+        if (near) {
+            return near
+        }
+    }
+    return null
+}
+
+
+/**
+ * 由yt-dlp之影片資訊挑選要下載之字幕軌
+ *
+ * 只考慮有json3格式之字幕軌；有手動字幕時只從手動字幕挑(任何語言之手動字幕皆優先於自動字幕)，否則從自動字幕挑；
+ * 依langs之順序挑選，語言代碼大小寫不分，同一語言先比完全相同再比語言前綴；自動字幕中語言相符者先取非機器翻譯者(原文軌與原文語言)，再取機器翻譯者，皆不符時取原文軌，無原文軌時取清單第1筆
+ *
+ * @param {Object} info 輸入yt-dlp之影片資訊物件，使用其subtitles與automatic_captions
+ * @param {Array} langs 輸入偏好語言字串陣列，例如['zh-TW','en']
+ * @returns {Object} 回傳{ track, translated, tracks }，track為所挑字幕軌{ languageCode, name, kind }，kind為'manual'或'asr'，translated為是否為機器翻譯之布林值(無原文軌而無從判定者為false)，tracks為挑選範圍內之全部字幕軌陣列；無可用字幕軌時回傳null
+ * @example
+ * import pickSubTrack from './src/pickSubTrack.mjs'
+ *
+ * let info = { subtitles: { 'zh-Hans': [{ ext: 'json3', name: 'Chinese (Simplified)' }, { ext: 'vtt', name: 'Chinese (Simplified)' }] } }
+ * console.log(pickSubTrack(info, ['zh-TW', 'zh']).track)
+ * // { languageCode: 'zh-Hans', name: 'Chinese (Simplified)', kind: 'manual' }
+ *
+ */
+function pickSubTrack(info, langs) {
+
+    //langs
+    if (!isArray(langs)) {
+        langs = []
+    }
+
+    //tracks, 手動字幕優先
+    let manual = listTracks(get(info, 'subtitles'), 'manual')
+    let tracks = manual.length > 0 ? manual : listTracks(get(info, 'automatic_captions'), 'asr')
+    if (tracks.length === 0) {
+        return null
+    }
+
+    //orig, base, 原文軌與原文語言
+    let orig = find(tracks, (t) => {
+        return reOrig.test(t.languageCode)
+    })
+    let base = orig ? orig.languageCode.replace(reOrig, '') : ''
+
+    //isTranslated
+    let isTranslated = (t) => {
+        return t.kind === 'asr' &amp;&amp; !!orig &amp;&amp; t.languageCode !== orig.languageCode &amp;&amp; t.languageCode !== base
+    }
+
+    //track
+    let notTranslated = filter(tracks, (t) => {
+        return !isTranslated(t)
+    })
+    let track = findByLangs(notTranslated, langs) || findByLangs(tracks, langs) || orig || tracks[0]
+
+    return { track, translated: isTranslated(track), tracks }
+}
+
+
+export default pickSubTrack
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Nov 04 2026 21:39:21 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

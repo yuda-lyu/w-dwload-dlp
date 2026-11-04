@@ -1,0 +1,94 @@
+import get from 'lodash-es/get.js'
+import isArray from 'lodash-es/isArray.js'
+import isString from 'lodash-es/isString.js'
+
+
+//pad2, 補至2位
+function pad2(n) {
+    return String(n).padStart(2, '0')
+}
+
+
+//ms2t, 毫秒轉時戳字串, 未滿1小時為mm:ss, 否則為hh:mm:ss
+function ms2t(ms) {
+    let total = Math.floor(ms / 1000)
+    let hh = Math.floor(total / 3600)
+    let mm = Math.floor((total % 3600) / 60)
+    let ss = total % 60
+    return hh > 0 ? `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}` : `${pad2(mm)}:${pad2(ss)}`
+}
+
+
+//toMs, 起始時間轉為毫秒整數; 收有限且不小於0之數字, 或由數字組成之字串(舊版timedtext以字串給值), 其餘(缺漏、負數、NaN、非數字)回傳null
+function toMs(v) {
+    if (isString(v) && /^\d+(\.\d+)?$/.test(v.trim())) {
+        v = Number(v)
+    }
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+        return Math.floor(v)
+    }
+    return null
+}
+
+
+/**
+ * 解析yt-dlp下載之json3字幕檔內容為字幕段落
+ *
+ * json3結構為{ events: [{ tStartMs, segs: [{ utf8 }] }] }，無segs之event為視窗定義；自動字幕之換行event其segs僅含空白，兩者皆略過；
+ * event之tStartMs缺漏或非有效數字時，沿用前一段落之tMs(首段為0)，使段落之tMs不遞減；不去除連續相同之文字，其為字幕本身(例如重複之[音樂])
+ *
+ * @param {String} str 輸入json3檔案內容字串
+ * @returns {Array} 回傳字幕段落陣列，每項為{ tMs, t, txt }，tMs為起始毫秒數字、t為時戳字串(mm:ss或hh:mm:ss)、txt為連續空白(含換行)已合併為單一空格之文字；內容非有效json或無任何文字時回傳空陣列
+ * @example
+ * import parseSubJson3 from './src/parseSubJson3.mjs'
+ *
+ * let str = JSON.stringify({ events: [{ tStartMs: 1000 }, { tStartMs: 133, segs: [{ utf8: '大家好' }, { utf8: ' 這裡' }] }] })
+ * console.log(parseSubJson3(str))
+ * // [ { tMs: 133, t: '00:00', txt: '大家好 這裡' } ]
+ *
+ */
+function parseSubJson3(str) {
+
+    //data
+    let data = null
+    try {
+        data = JSON.parse(str)
+    }
+    catch (err) {
+        return []
+    }
+
+    //events
+    let events = get(data, 'events')
+    if (!isArray(events)) {
+        return []
+    }
+
+    //segments
+    let segments = []
+    let tPre = 0
+    for (let ev of events) {
+        let segs = get(ev, 'segs')
+        if (!isArray(segs)) {
+            continue
+        }
+        let txt = segs.map((s) => {
+            let u = get(s, 'utf8')
+            return isString(u) ? u : ''
+        }).join('').replace(/\s+/g, ' ').trim()
+        if (txt === '') {
+            continue
+        }
+        let tMs = toMs(get(ev, 'tStartMs'))
+        if (tMs === null) {
+            tMs = tPre
+        }
+        tPre = tMs
+        segments.push({ tMs, t: ms2t(tMs), txt })
+    }
+
+    return segments
+}
+
+
+export default parseSubJson3

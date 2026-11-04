@@ -2,13 +2,25 @@
 //行為: 依yt-dlp之引數慣例解析-o,先在其後加.mp4.part寫出下載中之檔,結束時改寫成.mp4假影片檔(另留一個中介檔,模擬合併前之分軌檔),並輸出數列進度到stdout,離開碼0
 //模式(由url路徑末段決定): fail→留下.part與中介檔,於stderr輸出ERROR並以離開碼1結束; nofile→刪除.part且不寫輸出檔,離開碼0(模擬下載中被他人刪檔); 其餘→正常
 //閘門: 環境變數FAKE_DLP_GATE有值時,寫完.part後建立`${FAKE_DLP_GATE}-<末段>.started`,待`${FAKE_DLP_GATE}-<末段>`出現才繼續(供測試令併行之呼叫確定同時在跑)
-//用法: node test/tools/fakeDlp.mjs <url> -o <輸出路徑(無副檔名)> ...
+//字幕: 引數含--write-info-json或--load-info-json者為dwloadSubtitle之呼叫, 交test/tools/fakeDlpSub.mjs處理
+//用法: node test/tools/fakeDlp.mjs -o <輸出路徑(無副檔名)> ... -- <url>
+//url須在--之後(規則R5: url以-開頭時不得被yt-dlp當成選項), 沒有--者視為呼叫端有選項注入之缺陷, 以離開碼2結束
 import fs from 'fs'
 import path from 'path'
+import runFakeSub from './fakeDlpSub.mjs'
 
 
 let args = process.argv.slice(2)
-let url = args[0]
+if (args.includes('--write-info-json') || args.includes('--load-info-json')) {
+    runFakeSub(args)
+    process.exit(0)
+}
+let iSep = args.indexOf('--')
+if (iSep < 0 || iSep !== args.length - 2) {
+    console.error('ERROR: [fake] url must be the only argument after "--"')
+    process.exit(2)
+}
+let url = args[iSep + 1]
 let i = args.indexOf('-o')
 let fpBase = args[i + 1]
 let fpOut = `${fpBase}.mp4`

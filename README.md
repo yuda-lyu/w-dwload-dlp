@@ -71,6 +71,39 @@ test()
 // done: ./test.mp4
 ```
 
+## 下載字幕
+
+`WDwloadDlp.dwloadSubtitle(url, opt)` 只下載字幕、不下載影片,不需瀏覽器、登入與 `ffmpeg.exe`(只取 `yt-dlp.exe`);目前支援提供 json3 字幕軌之網站(YouTube).結果以物件回傳,不寫檔.
+
+```alias
+import WDwloadDlp from 'w-dwload-dlp/src/WDwloadDlp.mjs'
+
+async function test() {
+
+    let r = await WDwloadDlp.dwloadSubtitle('https://www.youtube.com/watch?v=TXcnAHNA0RU')
+
+    console.log(r.title, r.channel, r.uploadDate, r.durationString)
+    console.log(r.language, r.kind, r.translated, r.segmentsCount)
+    console.log(r.segments[0])
+}
+test()
+    .catch((err) => {
+        console.log('catch', err)
+    })
+// zh-Hans manual false 355
+// { tMs: 133, t: '00:00', txt: '大家好，这里是最佳拍档，我是大飞' }
+```
+
+- **選項 `opt.langs`**:偏好語言,非空字串或非空字串之非空陣列,依序比對(大小寫不分,先比完全相同,再比語言前綴,例如 `'zh'` 可中 `'zh-Hans'`);**預設 `['zh-TW', 'zh-Hant', 'zh', 'en']`(偏中文)**,要別的語言請自行傳入.非預期之輸入(空字串、空陣列、含非字串之陣列等)視為未給而改用預設,不報錯;`opt.debug: true` 時另輸出一次警告(出口為 `opt.funLog` 或 `console.warn`,不含傳入之值).
+- **挑選字幕軌**:只考慮有 json3 格式者(`live_chat` 等無 json3 者不列).**有手動字幕時只從手動字幕挑(任何語言之手動字幕皆優先於自動字幕,即使偏好語言只有自動字幕)**,否則從自動字幕挑;皆不符 `opt.langs` 時取原文軌(自動字幕之 `-orig`),無原文軌時取清單第 1 筆.
+- **機器翻譯**:自動字幕常含 YouTube 由原文機器翻譯之百餘種語言.語言相符者先取非機器翻譯者(原文軌與原文語言),只有機器翻譯相符時才取之,並回傳 `translated: true`(無原文軌而無從判定者為 `false`).要原文請把原文語言列入 `opt.langs`.
+- **回傳**:`url`、`videoId`、`title`、`channel`、`uploadDate`(YYYYMMDD)、`durationString`、`description`、`language`、`languageName`、`kind`(`manual` 手動/`asr` 自動)、`translated`、`availableTracks`(挑選範圍內之全部字幕軌)、`segments`(每項 `{ tMs, t, txt }`,依 YouTube 所給之順序)、`segmentsCount`、`plainText`(各段 `txt` 以換行串接,一段一行;**連續相同之行不去除**,其為字幕本身)、`timestampedText`(`[mm:ss] 文字`,逾 1 小時為 `[hh:mm:ss]`).
+- **錯誤**:reject 字串,首行為 `[代碼] 說明與處置`:`osNotSupported`、`invalidUrl`(非字串或空白,或為播放清單、頻道頁)、`exeNotReady`、`noSubtitle`(無可用字幕軌)、`outputNotFound`、`invalidOutput`(輸出檔無法讀取、解析或無文字),以及 yt-dlp 執行失敗時之分類(同 `WDwloadDlp`,如 `unavailable`、`http403`、`httpError`、`dlpFailed`),次行起為 yt-dlp 之 ERROR、WARNING 原文.
+- **限流**:YouTube 對字幕下載會限流(`HTTP Error 429`,機器翻譯軌尤甚),此時 reject 為 `[httpError] …`,訊息含 `HTTP Error 429` 原文;本函數**不重試、不另立分類**,請呼叫端自行延後重試.
+- **逾時**:與 `WDwloadDlp` 相同,不設整體逾時.yt-dlp 預設對無回應之連線 20 秒後放棄(實測),但對方若持續少量送出資料(標頭送不完),yt-dlp 不會逾時而可能無限等待;需要時請由呼叫端自行設定逾時.
+- 網址以 `-` 開頭者(如 `--version`)視為網址,不會被當成 yt-dlp 之選項(`WDwloadDlp` 亦同);只下載單一影片,`list` 參數會被忽略.
+- `yt-dlp.exe` 之取得與工作夾之建立、刪除皆與 `WDwloadDlp` 相同(見〈外部執行檔〉),併行呼叫互不影響.
+
 ## 外部執行檔
 
 本套件執行時需要下列外部執行檔,不含於 npm 包:
@@ -106,3 +139,4 @@ test()
 - 下載暫存夾由 `<yt-dlp.exe 所在夾>/Downloads`(各呼叫共用)改為每次呼叫專用之 `os.tmpdir()` 下之 `w-dwload-dlp/<14 位時間>-<6 碼 id>/`,結束時(成功或失敗)整夾刪除;`WDwloadDlp` 不再 `process.chdir`.
 - 移除選項 `opt.clean`:共用下載夾時預先清除會把併行呼叫下載中之檔清掉(`[outputNotFound]`),改為各呼叫自有工作夾後已無共用之暫存檔可清.傳入 `clean` 不再有作用(不保留別名);崩潰殘留之舊工作夾改由每次呼叫開始時自動清除逾 24 小時者.
 - 新增相依 `wsemi` ≥ 1.9.27、`w-ffmpeg` ≥ 1.0.29;`ffmpeg.exe` 不再位於 `node_modules/w-ffmpeg/src/`.
+- `WDwloadDlp(url, fp, opt)` 把 `url` 置於 yt-dlp 引數 `--` 之後(修正選項注入):以 `-` 開頭之 `url`(例如 `--version`)改視為網址,由 yt-dlp 回 `[dlpFailed] … is not a valid URL`;原先會被當成 yt-dlp 選項執行(`--version` 令 yt-dlp 印出版本並以離開碼 0 結束,回 `[outputNotFound]`).呼叫端若以未經驗證之字串當 `url`,不再能夾帶選項.

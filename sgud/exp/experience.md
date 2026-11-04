@@ -2,6 +2,17 @@
 
 本檔為執行工作時特有之累積經驗,留給後續之嘗試、執行與判斷,由agent自行編列、擴充與維護.過長時抽出舊者為`experience_<年月日>.md`,並於本檔註明何時抽出.
 
+## 字幕入口與選項注入(2026-11-04,wd72,Gitea #72)
+
+- **yt-dlp 2026.10.26 字幕行為(皆實測)**:①字幕軌無 json3 時 `--sub-format json3` **不報錯**,印 `WARNING: No subtitle format found matching "json3" for language zh-Hant, using vtt` 後改下載 `dl.zh-Hant.vtt`,離開碼 0(`jfXg5ZslKg4` 之自動軌 `zh-Hant`〔僅 vtt〕;同片另有手動 `zh-Hant`〔有 json3〕);②自動軌第 1 筆格式常為無 `name` 之 vtt(`TXcnAHNA0RU` 之 `zh-Hans`:`[{ext:vtt},{ext:json3,name:…},…]`),`name` 要取 json3 該筆;③純自動字幕影片(`9bZkp7q19f0`)157 軌皆有 json3,第 1 筆為 `ab`(Abkhazian,機器翻譯),原文軌為 `ko-orig`;④`live_chat`(ext `json`)出現在**直播中**之影片(`mhJRzQsLZGg` 之 `--list-subs` 為 `live_chat json`),曾直播之回放(`was_live`,試 5 部)之 info.json 無此鍵——有則因無 json3 被排除;⑤有 CC 字幕之直播回放,自動軌名稱為 `<語言>-<手動軌代碼>`(如 `ab-en-uYU-mmqFLq8`),手動軌代碼本身為 `en-uYU-mmqFLq8`(非標準 BCP47),沒有 `-orig`.
+- **`--sub-langs` 之值是正規式**(yt-dlp 以 `值$` 錨定比對,`-` 開頭者為排除):語言代碼取自 yt-dlp 回傳之字典,仍篩 `^[A-Za-z0-9][A-Za-z0-9_-]*$` 才列入,同時避免特殊字元進入輸出檔名.
+- **頻道頁**(`@YouTube/videos`):不加 `--flat-playlist` 時 `--playlist-items 1:2` 要約 5.6 秒且逐一解析影片;加後約 2.6 秒;`--flat-playlist` 不限項目時列舉 199 項約 4.1 秒(列舉全部才得知是清單,項目多的頻道會更久),故再加 `--playlist-items 1`(仍 2.6 秒,`_type` 仍 `playlist`).`--write-info-json` 對播放清單寫出之 info.json 不含 `entries`(約 3 KB);`_type` 為 `playlist`;單一影片之 `_type` 為 `video`.
+- **429**:連續呼叫後機器翻譯軌(`zh-Hant`、`ko`)下載字幕回 `ERROR: Unable to download video subtitles for 'zh-Hant': HTTP Error 429: Too Many Requests`(info 呼叫與原文軌通常不受影響);分類為 `[httpError]`.功能測試只把此型(`[httpError]` 且含 `HTTP Error 429`)標 pending,其餘錯誤照常失敗;預期值由 oracle(直接以 yt-dlp 取同一影片資訊)導出,不寫死特定軌,前提不成立以 `[fixture changed upstream]` 失敗,別於函數缺陷.
+- **yt-dlp 逾時**(本機 127.0.0.1 伺服器實測,`tmp/` 腳本結束即清):伺服器接受連線不回應 → 約 23 秒 `ERROR: [generic] x: Unable to download webpage: … Read timed out. (read timeout=20.0)`;伺服器每 3 秒送 1 位元組(標頭永不結束)→ 80 秒仍不結束(per-read 逾時不觸發),可能無限等待.wsemi `execProcess` 有 `opt.timeout`(殺行程樹),本套件主控裁示不加.
+- **真實 json3 之特性**(4 份樣本):`tStartMs` 皆有;手動軌無 `aAppend`;自動軌有 `aAppend:1` 之換行 event(`segs` 僅 `\n`)與 `acAsrConf`、`tOffsetMs`、`isSpeakerChange`;連續相同行 0 筆(故不去重,保持與 segments 一對一);滾動前綴(下一行以上一行為前綴)偶有.
+- **測試夾具**:`test/tools/fakeDlp.mjs` 要求 url 為 `--` 之後唯一引數(否則離開碼 2),使「漏加 `--`」令全部主函數類測試轉紅(修前紅 9 案);選項注入另以真 yt-dlp.exe 驗(`test/api-optionInjection.test.mjs`,`--version`/`--help` 不連外網,修前回 `[outputNotFound]`).`createFakeRun` 一律攔截 `cp.spawn`,要用真 yt-dlp 之測試自建環境(本機鏡像＋`W_BIN_OFFLINE=1`＋只替換 `WFfmpeg.ensureBins`).
+- **變異/修前紅腳本**(`tmp/wd72/`,結束即清):`mutate.mjs`(逐項取代 src 後跑相關測試,`--reporter json` 取失敗數,結束還原並比對 sha256)＋`redrun.mjs`(以 `git show HEAD:` 還原主檔並隱藏新模組,跑新測試).`src` 為 CRLF,Edit 工具會保留 CRLF,Write 新檔為 LF,收尾以腳本統一轉 CRLF(`.gitattributes` 雖未設 `text`,`core.autocrlf=true`).mocha `--no-parallel` 載入失敗之測試檔(`ERR_MODULE_NOT_FOUND`)會使整次執行中止而無 json 結果,修前紅要分檔跑.
+
 ## 併行呼叫與工作夾(2026-10-29,bin-dlp2)
 
 - **根因**:`dw_mp4`、`dw_m3u8` 兩功能測試在 `mocha --parallel` 下各在一個 worker 行程,共用同一下載夾,且皆 `clean: true`(`fsCleanFolder` 整夾)→ 後開始者清掉先開始者下載中之檔 → `[outputNotFound] … it may be removed during downloading`.改造前下載夾在執行檔旁(同樣共用),屬既有缺陷;`clean` 之 JSDoc 自承「單一程序執行時」才可用,即**並行即互相破壞之設計**,不是時序偶發.修法是消除共用(每次呼叫自有工作夾)而非調 `clean` 或加鎖.

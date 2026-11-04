@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#WDwloadDlp">WDwloadDlp</a></li><li><a href="global.html#dwloadSubtitle">dwloadSubtitle</a></li><li><a href="global.html#ensureBins">ensureBins</a></li><li><a href="global.html#parseDlpError">parseDlpError</a></li><li><a href="global.html#parseSubJson3">parseSubJson3</a></li><li><a href="global.html#pickSubTrack">pickSubTrack</a></li></ul>
     
 </nav>
 
@@ -152,7 +152,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line138">line 138</a>
+        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line171">line 171</a>
     </li></ul></dd>
     
 
@@ -262,7 +262,7 @@
                 </td>
             
 
-            <td class="description last"><p>輸入網址字串，支援網站種類詳見yt-dlp</p></td>
+            <td class="description last"><p>輸入網址字串，支援網站種類詳見yt-dlp；以-開頭之字串亦視為網址，不會被當成yt-dlp選項</p></td>
         </tr>
 
     
@@ -435,6 +435,383 @@
         
 <div class="param-desc">
     <p>回傳Promise，resolve回傳成功訊息，reject回傳錯誤訊息字串，首行固定為<code>[代碼] 說明與處置</code>供調用方判斷錯誤類型，代碼可為osNotSupported、invalidUrl、exeNotReady、outputNotFound、copyFailed，以及yt-dlp執行失敗時由parseDlpError分類之unsupportedUrl、unavailable、sslFailed、dnsFailed、connectFailed、http403、http404、httpError、dlpFailed、execFailed，yt-dlp執行失敗時次行起依序為下載進度(有fragment資訊時)與yt-dlp之ERROR、WARNING原文</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="dwloadSubtitle"><span class="type-signature type-signature-async">(async) </span>dwloadSubtitle<span class="signature">(url, opt<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>下載字幕(不下載影片)，核心調用yt-dlp，只能用於Windows作業系統，目前支援提供json3字幕軌之網站(YouTube)，不需瀏覽器與登入，也不需ffmpeg.exe</p>
+<p>先取得影片資訊與字幕軌清單，依語言偏好挑選1軌後，再由yt-dlp下載該軌之json3字幕並解析；挑選規則見pickSubTrack：
+有手動字幕時只從手動字幕挑(任何語言之手動字幕皆優先於自動字幕)，否則從自動字幕挑，自動字幕中語言相符者先取非機器翻譯者</p>
+<p>yt-dlp.exe之取得、工作夾之建立與刪除皆與WDwloadDlp相同，併行調用互不影響；結果不寫檔，由呼叫端自行處理；
+與WDwloadDlp相同不設整體逾時：yt-dlp預設20秒無回應即放棄，但對方持續少量送出資料時可能無限等待，需要時請由呼叫端自行設定逾時；
+YouTube對字幕下載會限流(HTTP 429，機器翻譯軌尤甚)，本函數不重試，reject為httpError，訊息含原文</p></li></ul></dd>
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="WDwloadDlp.mjs.html">WDwloadDlp.mjs</a>, <a href="WDwloadDlp.mjs.html#line616">line 616</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+    <h5 class="h5-examples">Example</h5>
+    
+    <pre class="prettyprint"><code>import fs from 'fs'import WDwloadDlp from './src/WDwloadDlp.mjs'async function test() {    let url = `https://www.youtube.com/watch?v=TXcnAHNA0RU`    let r = await WDwloadDlp.dwloadSubtitle(url)    console.log(r.language, r.kind, r.segmentsCount)    console.log(r.segments[0])    fs.writeFileSync('./subtitle.json', JSON.stringify(r, null, 2), 'utf8')}test()    .catch((err) => {        console.log('catch', err)    })// zh-Hans manual 355// { tMs: 133, t: '00:00', txt: '大家好，这里是最佳拍档，我是大飞' }</code></pre>
+
+
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>url</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入單一影片之網址字串，播放清單或頻道頁網址將reject；以-開頭之字串亦視為網址，不會被當成yt-dlp選項</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>opt</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>{}</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入設定物件，預設{}</p>
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>langs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+|
+
+<span class="param-type">Array</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>['zh-TW','zh-Hant','zh','en']</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入偏好語言，為非空字串或非空字串之非空陣列，依序比對語言代碼(大小寫不分，先比完全相同，再比語言前綴，例如'zh'可中'zh-Hans')，非預期之輸入改用預設</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>debug</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>false</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入是否於opt.langs為非預期之輸入時輸出警告，須為true才生效，警告不含傳入之值，同一行程只警告一次，預設false</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>funLog</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    <code>null</code>
+                
+                </td>
+            
+
+            <td class="description last"><p>輸入警告輸出函數，格式為(msg, { fn, reason, key })=&gt;{}，未給則用console.warn，預設null</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5 class="h5-returns">Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳Promise，resolve回傳物件，含url、videoId、title、channel、uploadDate(YYYYMMDD)、durationString、description、language(所挑字幕軌之語言代碼)、languageName、kind('manual'為手動字幕，'asr'為自動字幕)、translated(是否為YouTube機器翻譯之布林值，無原文軌而無從判定者為false)、availableTracks(挑選範圍內之全部字幕軌，每項為{ languageCode, name, kind })、segments(字幕段落，每項為{ tMs, t, txt })、segmentsCount、plainText(各段落之txt以換行串接，不去除連續相同之行)、timestampedText；reject回傳錯誤訊息字串，首行固定為<code>[代碼] 說明與處置</code>，代碼可為osNotSupported、invalidUrl(非字串、空字串，或為播放清單、頻道頁)、exeNotReady、noSubtitle(無可用字幕軌)、outputNotFound、invalidOutput(輸出檔無法讀取、內容無法解析或無文字)，以及yt-dlp執行失敗時由parseDlpError分類者</p>
 </div>
 
 
@@ -1034,6 +1411,360 @@ console.log(parseDlpError(stderr, { nnf: 24, naf: 406 }))
 
 
         
+            
+
+    
+
+    <h4 class="name" id="parseSubJson3"><span class="type-signature"></span>parseSubJson3<span class="signature">(str)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>解析yt-dlp下載之json3字幕檔內容為字幕段落</p>
+<p>json3結構為{ events: [{ tStartMs, segs: [{ utf8 }] }] }，無segs之event為視窗定義；自動字幕之換行event其segs僅含空白，兩者皆略過；
+event之tStartMs缺漏或非有效數字時，沿用前一段落之tMs(首段為0)，使段落之tMs不遞減；不去除連續相同之文字，其為字幕本身(例如重複之[音樂])</p></li></ul></dd>
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="parseSubJson3.mjs.html">parseSubJson3.mjs</a>, <a href="parseSubJson3.mjs.html#line50">line 50</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+    <h5 class="h5-examples">Example</h5>
+    
+    <pre class="prettyprint"><code>import parseSubJson3 from './src/parseSubJson3.mjs'let str = JSON.stringify({ events: [{ tStartMs: 1000 }, { tStartMs: 133, segs: [{ utf8: '大家好' }, { utf8: ' 這裡' }] }] })console.log(parseSubJson3(str))// [ { tMs: 133, t: '00:00', txt: '大家好 這裡' } ]</code></pre>
+
+
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>str</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>輸入json3檔案內容字串</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5 class="h5-returns">Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳字幕段落陣列，每項為{ tMs, t, txt }，tMs為起始毫秒數字、t為時戳字串(mm:ss或hh:mm:ss)、txt為連續空白(含換行)已合併為單一空格之文字；內容非有效json或無任何文字時回傳空陣列</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array</span>
+
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="pickSubTrack"><span class="type-signature"></span>pickSubTrack<span class="signature">(info, langs)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+    
+    <dt class="tag-description">Description:</dt>
+    <dd class="tag-description"><ul class="dummy"><li><p>由yt-dlp之影片資訊挑選要下載之字幕軌</p>
+<p>只考慮有json3格式之字幕軌；有手動字幕時只從手動字幕挑(任何語言之手動字幕皆優先於自動字幕)，否則從自動字幕挑；
+依langs之順序挑選，語言代碼大小寫不分，同一語言先比完全相同再比語言前綴；自動字幕中語言相符者先取非機器翻譯者(原文軌與原文語言)，再取機器翻譯者，皆不符時取原文軌，無原文軌時取清單第1筆</p></li></ul></dd>
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="pickSubTrack.mjs.html">pickSubTrack.mjs</a>, <a href="pickSubTrack.mjs.html#line83">line 83</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+    <h5 class="h5-examples">Example</h5>
+    
+    <pre class="prettyprint"><code>import pickSubTrack from './src/pickSubTrack.mjs'let info = { subtitles: { 'zh-Hans': [{ ext: 'json3', name: 'Chinese (Simplified)' }, { ext: 'vtt', name: 'Chinese (Simplified)' }] } }console.log(pickSubTrack(info, ['zh-TW', 'zh']).track)// { languageCode: 'zh-Hans', name: 'Chinese (Simplified)', kind: 'manual' }</code></pre>
+
+
+
+
+    <h5 class="h5-parameters">Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>info</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>輸入yt-dlp之影片資訊物件，使用其subtitles與automatic_captions</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>langs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>輸入偏好語言字串陣列，例如['zh-TW','en']</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5 class="h5-returns">Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>回傳{ track, translated, tracks }，track為所挑字幕軌{ languageCode, name, kind }，kind為'manual'或'asr'，translated為是否為機器翻譯之布林值(無原文軌而無從判定者為false)，tracks為挑選範圍內之全部字幕軌陣列；無可用字幕軌時回傳null</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
     
 
     
@@ -1053,7 +1784,7 @@ console.log(parseDlpError(stderr, { nnf: 24, naf: 406 }))
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Nov 04 2026 16:34:22 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Nov 04 2026 21:39:21 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
