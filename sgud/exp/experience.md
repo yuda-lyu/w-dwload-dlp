@@ -45,4 +45,5 @@
 - **暫存檔所有權**:以 `wx` 排他建立失敗(EEXIST)的同名檔不屬於本次下載,清理時不可刪(外審以固定亂數名實測會刪掉另一下載的檔);判斷「是否為檔案錯誤」看頂層錯誤的 `syscall`,是否為 EEXIST 看 `code`.
 - **外審 sol 的收穫形狀**:找得到的多是「改壞實作而測試仍綠」的缺口(拿掉 `touch()`、每請求各給一份總時間、略過更名時的雜湊比對、忽略 content-encoding、刪掉 `.npmignore` 規則)——寫完測試後自己做變異(拿掉檢查再跑)最有效.
 - **npm 包檢查之斷言口徑(2026-11-02,dspec〈自有套件之npm發布範圍〉)**:`sgud/`、`docs/`、`test/`、`toolg/`、`script.txt` 隨包,測試只可斷言「外部執行檔與壓縮檔、`bin/` 除清單外、`CLAUDE*.md`、`tmp/`、`test/_tmp/`、`.env` 不在」,並斷言 `sgud/`、`test/tools/` 在;誘餌檔要放在會入包之位置(如 `src/__x__.exe`)才證明得了斷言有效,放在 `bin/` 只證明 `.npmignore` 規則有效.`.npmignore` 首段依原則 3 須逐行等於 `.gitignore`(含註解);原先把 `test/_tmp`、`/bin-cache/` 放在第 1 條段而首段缺這兩行,生效結果相同但不合原則 3.
+- **wsemi 1.9.64 起 `E_OFFLINE_MISSING` 訊息不帶值(V20)與本套件之字串包裝**(2026-11-18):`WDwloadDlp`／`dwloadSubtitle` 之 `[exeNotReady]` 次行原轉抄 `ensureBins` 之訊息(含 sha256、路徑);訊息改版後轉抄之內容已不含值,但其「見此錯誤之 missing 欄位」對字串使用者無意義,故改由 `strExeNotReady` 重組:離線缺檔時只列 `err.missing[].name` 與固定說明(離線準備請呼叫 `ensureBins()` 並讀 `err.missing[]`),其餘錯誤碼沿用原說明.測試以假 `WFfmpeg.ensureBins`(`fakeRun` 之 `ffMode: 'offline'`,訊息與 `missing` 帶逐筆相異之值)確認包裝只取檔名不轉抄訊息;變異(包裝還原為轉抄)使 5 案轉紅.
 - **測試中 mocha 逾時**:`autoDownloadFiles()` 走預設重試(間隔 20/40/60 秒),測試要觸發失敗路徑時用確定性錯誤(如回 404)而非網路例外,否則測試要等 2 分鐘.

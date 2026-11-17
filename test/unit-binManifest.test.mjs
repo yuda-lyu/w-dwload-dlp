@@ -127,6 +127,10 @@ describe(`bin/manifest.json`, function() {
             assert.strict.equal(c.includes(k), true, `README lacks ${k}`)
         }
         assert.strict.equal(sec.includes('W_BIN_MIRROR'), true)
+        //O5(2026-11-18): 離線缺檔時之放置位置自err.missing[](cachePath、mirrorPath)讀取, 並附最小範例(讀E_OFFLINE_MISSING之err.missing)
+        for (let k of ['err.missing', 'cachePath', 'mirrorPath', `err.code === 'E_OFFLINE_MISSING'`, 'console.log(err.missing)']) {
+            assert.strict.equal(sec.includes(k), true, `README section lacks ${k}`)
+        }
     })
 
     it(`should keep the cache folder out of git and treat bin/ as binary so that the work tree bytes equal the GitHub blobs (S5, M1 F12)`, function() {

@@ -7,7 +7,7 @@ import WFfmpeg from 'w-ffmpeg'
 //createFakeRun, 主函數類測試(api-ensureBins、api-workFolder)共用之假執行環境: WDwloadDlp主函數無法注入fetch與spawn, 故攔截全域fetch(被呼叫即記錄並拋錯)與child_process.spawn(記錄後改以node執行假yt-dlp), 另以假檔取代w-ffmpeg之ensureBins
 //斷言: 未連網(否則回歸為直連時測試仍會因真網路而綠)、啟動者為ensureBins回傳之路徑(舊路徑檔與快取檔位元相同時, 只驗功能輸出之測試對[先取得卻仍用舊路徑]盲)
 //用法: let fr = createFakeRun('案名'); before(fr.install); after(fr.uninstall); beforeEach(fr.reset)
-//陣列netCalls、spawnCalls、ffCalls全程為同一個物件(reset時就地清空), 可解構後長期持有; ffMode可設為'fail'令假WFfmpeg.ensureBins拋錯, reset時還原為'ok'
+//陣列netCalls、spawnCalls、ffCalls全程為同一個物件(reset時就地清空), 可解構後長期持有; ffMode可設為'fail'令假WFfmpeg.ensureBins拋錯、'offline'令其拋E_OFFLINE_MISSING(帶ffMissing), reset時還原為'ok'
 function createFakeRun(tag) {
     let fdt = path.resolve('./test/_tmp', tag)
     let manifest = JSON.parse(fs.readFileSync('bin/manifest.json', 'utf8'))
@@ -30,6 +30,7 @@ function createFakeRun(tag) {
         spawnCalls: [],
         ffCalls: [],
         ffMode: 'ok',
+        ffMissing: { name: 'ffmpeg.exe', sha256: 'f1e2d3c4b5a6978877665544332211009f8e7d6c5b4a39281706f5e4d3c2b1a0', size: 123456789, cachePath: 'Z:\\fake-w-ffmpeg-cache\\f1e2d3c4\\ffmpeg.exe', mirrorPath: null, url: 'https://fake.invalid/w-ffmpeg/ffmpeg.exe', member: null, archive: null, parts: null, reasons: [], bundle: null },
     }
 
     //setEnv, 設定W_BIN_*環境變數(未給或值為undefined者刪除)
@@ -61,6 +62,13 @@ function createFakeRun(tag) {
             if (fr.ffMode === 'fail') {
                 let err = new Error('fake failure of w-ffmpeg')
                 err.code = 'E_FAKE_FFMPEG'
+                throw err
+            }
+            if (fr.ffMode === 'offline') {
+                //離線缺檔: 帶code與結構欄位missing[](值為逐筆相異之sha256、大小、路徑); 訊息刻意帶值與標記, 用以確認包裝不轉抄訊息而只取missing[].name
+                let err = new Error(`fake offline message FAKE-MSG-MARK ${fr.ffMissing.sha256} ${fr.ffMissing.cachePath}`)
+                err.code = 'E_OFFLINE_MISSING'
+                err.missing = [fr.ffMissing]
                 throw err
             }
             return { 'ffmpeg.exe': fr.fpFakeFfmpeg }

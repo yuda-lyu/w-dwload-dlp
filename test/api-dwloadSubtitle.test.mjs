@@ -433,6 +433,10 @@ describe(`dwloadSubtitle`, function() {
             let ls = err.split('\n')
             assert.strict.equal(ls[0].startsWith('[exeNotReady] '), true, err)
             assert.strict.equal(ls[1].startsWith('E_OFFLINE_MISSING'), true, err)
+            //次行(V20): 缺哪個檔(檔名)與固定說明(讀err.missing[]取得放置位置), 不帶sha256、路徑、網址
+            assert.strict.equal(ls.length, 2, err)
+            assert.strict.equal(ls[1].includes('yt-dlp.exe') && ls[1].includes('err.missing[]'), true, err)
+            assert.strict.equal(/[0-9a-f]{64}/i.test(err) || err.includes(path.join(fdt, 'cacheEmpty')) || err.includes('https://'), false, err)
             assert.strict.equal(spawnCalls.length, 0)
             assert.strict.deepEqual(workLeft(), [])
         }

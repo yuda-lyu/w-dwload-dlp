@@ -389,6 +389,8 @@ describe(`ensureBins (floating mode)`, function() {
         let cacheDir = newDir('cache')
         let err = await catchErr(() => ensure(cacheDir, { fetch: fetchBan, mirror, offline: true }))
         assert.strict.equal(err && err.code, 'E_OFFLINE_MISSING', err && err.message)
+        assert.strict.deepStrictEqual(err.missing.map((v) => [v.name, v.mirrorPath]), [[name, fpMirror]]) //被拒用之鏡像檔位置在missing(V20: 不在訊息)
+        assert.strict.equal(err.message.includes(mirror), false, err.message)
         assert.strict.deepStrictEqual(cacheFiles(cacheDir), [])
 
         let mirror2 = newDir('mirror')
@@ -417,19 +419,50 @@ describe(`ensureBins (floating mode)`, function() {
         assert.strict.deepStrictEqual(urls, [urlManifest])
     })
 
-    it(`should reject offline with E_OFFLINE_MISSING naming the file, sha256, size, the cache path and the mirror path when nothing is available, without any network (T6, O3, E3)`, async function() {
+    //V20(訊息不帶值, 2026-11-18): 訊息只含檔名與準備方法, 不含sha256、大小、快取與鏡像路徑、網址;
+    //  缺檔之名稱、sha256、大小、應放位置、來源改由err.missing[]之結構欄位提供(O3、O5、T6)
+    //pickMissing, 缺檔項之欄位(單一檔, 非壓縮檔解出者, 故url為清單所載之取得網址, member、archive、parts、bundle為null)
+    let pickMissing = (m) => {
+        return { name: m.name, sha256: m.sha256, size: m.size, cachePath: m.cachePath, mirrorPath: m.mirrorPath, url: m.url, member: m.member, archive: m.archive, parts: m.parts, bundle: m.bundle }
+    }
+    let wantMissing = (cacheDir, mirror) => {
+        return { name, sha256: realSha, size: realBuf.length, cachePath: path.join(cacheDir, realSha, name), mirrorPath: mirror ? path.join(mirror, pkgName, realSha, name) : null, url: urlExe, member: null, archive: null, parts: null, bundle: null }
+    }
+    //noValueInMessage, 訊息不帶值: 含檔名; 不含sha256(任何64位十六進位字串)、`<大小> bytes`、清單之網址與給定之路徑
+    let noValueInMessage = (err, dirs) => {
+        assert.strict.equal(err.message.includes(name), true, err.message)
+        assert.strict.equal(/[0-9a-f]{64}/i.test(err.message), false, `message must not carry any sha256: ${err.message}`)
+        for (let v of [realSha, `${realBuf.length} bytes`, urlExe, ...dirs]) {
+            assert.strict.equal(err.message.includes(v), false, `message must not carry ${v}: ${err.message}`)
+        }
+    }
+
+    it(`should reject offline with E_OFFLINE_MISSING naming the file in the message and giving sha256, size and the cache path in err.missing when nothing is available, without any network (T6, O3, O5, E3, V20)`, async function() {
         let cacheDir = newDir('cache')
         let err = await catchErr(() => ensure(cacheDir, { fetch: fetchBan, offline: true }))
         assert.strict.equal(err && err.code, 'E_OFFLINE_MISSING', err && err.message)
-        let cachePath = path.join(cacheDir, realSha, name)
-        assert.strict.equal(err.message.includes(name), true, err.message)
-        assert.strict.equal(err.message.includes(realSha), true, err.message) //離線不取主幹清單, 故為基準清單所載之值
-        assert.strict.equal(err.message.includes(`${realBuf.length} bytes`), true, err.message)
-        assert.strict.equal(err.message.includes(cachePath), true, err.message)
-        assert.strict.equal(err.message.includes(`<W_BIN_MIRROR>/${pkgName}/${realSha}/${name}`), true, err.message)
-        assert.strict.deepStrictEqual(err.missing.map((v) => [v.name, v.sha256, v.size, v.cachePath]), [[name, realSha, realBuf.length, cachePath]])
+        //規則(O3、V20): 訊息只寫缺哪個檔(名稱)與準備方法, 不含sha256、大小、路徑
+        noValueInMessage(err, [cacheDir, fdt])
+        assert.strict.equal(err.message.includes('missing field of this error'), true, err.message) //準備方法: 細節見err.missing
+        //規則(O3、O5、T6): sha256、大小、cachePath(無鏡像時mirrorPath為null)、來源url皆在err.missing[]; 離線不取主幹清單, 故為基準清單所載之值
+        assert.strict.equal(Array.isArray(err.missing), true)
+        assert.strict.deepStrictEqual(err.missing.map(pickMissing), [wantMissing(cacheDir, null)])
+        assert.strict.deepStrictEqual(err.missing[0].reasons, [])
         assert.strict.deepStrictEqual(urls, [])
         assert.strict.deepStrictEqual(hits, []) //連主幹清單都不取
+        assert.strict.deepStrictEqual(listFiles(cacheDir), [])
+    })
+
+    it(`should give the mirror path in err.missing, and not in the message, when the mirror is set but holds no file (T6, O3, O5, V20)`, async function() {
+        let cacheDir = newDir('cache')
+        let mirror = newDir('mirror')
+        fs.mkdirSync(mirror, { recursive: true }) //指定而無任何檔之鏡像
+        let err = await catchErr(() => ensure(cacheDir, { fetch: fetchBan, mirror, offline: true }))
+        assert.strict.equal(err && err.code, 'E_OFFLINE_MISSING', err && err.message)
+        noValueInMessage(err, [cacheDir, mirror])
+        assert.strict.deepStrictEqual(err.missing.map(pickMissing), [wantMissing(cacheDir, mirror)])
+        assert.strict.deepStrictEqual(err.missing[0].reasons, []) //鏡像無此檔(非拒用)故無說明
+        assert.strict.deepStrictEqual(urls, [])
         assert.strict.deepStrictEqual(listFiles(cacheDir), [])
     })
 
@@ -504,7 +537,9 @@ describe(`ensureBins (floating mode)`, function() {
             return catchErr(() => ensureBins({ fetch: fetchBan }))
         })
         assert.strict.equal(err && err.code, 'E_OFFLINE_MISSING', err && err.message)
-        assert.strict.equal(err.message.includes(path.join(envRoot2, pkgName, realSha, name)), true, err.message)
+        //應放位置在err.missing[].cachePath(V20: 不在訊息): 由W_BIN_CACHE衍生之<W_BIN_CACHE>/<套件>/<sha256>/<name>
+        assert.strict.deepStrictEqual(err.missing.map((v) => [v.name, v.cachePath]), [[name, path.join(envRoot2, pkgName, realSha, name)]])
+        assert.strict.equal(err.message.includes(envRoot2), false, err.message)
         assert.strict.deepStrictEqual(urls, [])
     })
 
@@ -616,16 +651,28 @@ describe(`entries without an injectable fetch`, function() {
         assert.strict.equal(progs.length > 0 && progs[progs.length - 1][0] === 100, true)
     })
 
-    it(`should reject with "[exeNotReady]" carrying E_OFFLINE_MISSING and the sha256 when yt-dlp.exe is not available offline, before asking for ffmpeg.exe and without starting any program (E3)`, async function() {
+    it(`should reject with "[exeNotReady]" carrying E_OFFLINE_MISSING, the file name and the fixed hint, and no sha256, path or url, when yt-dlp.exe is not available offline, before asking for ffmpeg.exe and without starting any program (E3, O3, V20)`, async function() {
         if (!isWindows()) {
             this.skip()
         }
-        setEnv({ W_BIN_CACHE: path.join(fdt, 'cache-b'), W_BIN_OFFLINE: '1' })
+        let cacheRoot = path.join(fdt, 'cache-b')
+        setEnv({ W_BIN_CACHE: cacheRoot, W_BIN_OFFLINE: '1' })
         let err = await WDwloadDlp('https://example.invalid/v', path.join(fdt, 'out', 'b.mp4')).catch((e) => e)
         assert.strict.equal(typeof err, 'string') //既有之reject型態為字串
         assert.strict.equal(err.startsWith('[exeNotReady] '), true, err)
-        assert.strict.equal(err.includes('E_OFFLINE_MISSING'), true, err)
-        assert.strict.equal(err.includes(sha256), true, err)
+        let ls = err.split('\n')
+        assert.strict.equal(ls.length, 2, err) //首行處置, 次行錯誤碼與說明
+        //次行(V20): 錯誤碼＋缺哪個檔(檔名)＋固定說明(離線準備請呼叫ensureBins()並讀err.missing[]取得放置位置)
+        assert.strict.equal(ls[1], 'E_OFFLINE_MISSING offline: yt-dlp.exe not in the cache or the mirror; to prepare offline, call ensureBins() (of this package for yt-dlp.exe, of w-ffmpeg for ffmpeg.exe) and read err.missing[] for where to put the file(s)')
+        //不帶值: 無sha256(含清單所載者)、路徑、網址、大小
+        assert.strict.equal(/[0-9a-f]{64}/i.test(err), false, err)
+        for (let v of [sha256, cacheRoot, fdt, mirror, 'https://', ' bytes']) {
+            assert.strict.equal(err.includes(v), false, `${v}: ${err}`)
+        }
+        //放置位置改由ensureBins()之err.missing[]取得(同環境): 名稱、sha256與cachePath
+        let errBins = await ensureBins({ names: name }).catch((e) => e)
+        assert.strict.equal(errBins instanceof Error && errBins.code, 'E_OFFLINE_MISSING')
+        assert.strict.deepStrictEqual(errBins.missing.map((v) => [v.name, v.sha256, v.cachePath]), [[name, sha256, path.join(cacheRoot, pkgName, sha256, name)]])
         assert.strict.deepStrictEqual(netCalls, [])
         assert.strict.deepStrictEqual(spawnCalls, [])
         assert.strict.deepStrictEqual(ffCalls, [])
@@ -641,6 +688,26 @@ describe(`entries without an injectable fetch`, function() {
         assert.strict.equal(typeof err, 'string')
         assert.strict.equal(err.startsWith('[exeNotReady] '), true, err)
         assert.strict.equal(err.includes('E_FAKE_FFMPEG'), true, err)
+        assert.strict.deepStrictEqual(spawnCalls, [])
+        assert.strict.deepStrictEqual(netCalls, [])
+    })
+
+    it(`should name only the file of err.missing in the string when ffmpeg.exe is missing offline, without copying the message, sha256, path or url (E3, O3, V20)`, async function() {
+        if (!isWindows()) {
+            this.skip()
+        }
+        setEnv({ W_BIN_CACHE: path.join(fdt, 'cache-c2'), W_BIN_MIRROR: mirror, W_BIN_OFFLINE: '1' })
+        fr.ffMode = 'offline'
+        let err = await WDwloadDlp('https://example.invalid/v', path.join(fdt, 'out', 'c2.mp4')).catch((e) => e)
+        assert.strict.equal(typeof err, 'string')
+        let ls = err.split('\n')
+        assert.strict.equal(ls.length, 2, err)
+        assert.strict.equal(ls[0].startsWith('[exeNotReady] '), true, err)
+        //缺的檔名取自err.missing[](ffmpeg.exe, 非yt-dlp.exe: yt-dlp.exe自鏡像取得成功), 其餘為固定說明
+        assert.strict.equal(ls[1], 'E_OFFLINE_MISSING offline: ffmpeg.exe not in the cache or the mirror; to prepare offline, call ensureBins() (of this package for yt-dlp.exe, of w-ffmpeg for ffmpeg.exe) and read err.missing[] for where to put the file(s)')
+        for (let v of [fr.ffMissing.sha256, fr.ffMissing.cachePath, fr.ffMissing.url, 'FAKE-MSG-MARK', String(fr.ffMissing.size)]) {
+            assert.strict.equal(err.includes(v), false, `${v}: ${err}`)
+        }
         assert.strict.deepStrictEqual(spawnCalls, [])
         assert.strict.deepStrictEqual(netCalls, [])
     })

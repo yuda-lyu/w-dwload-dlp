@@ -48,6 +48,25 @@ function isWindows() {
 }
 
 
+//strExeNotReady, 取得外部執行檔失敗時reject之字串(既有契約為字串, 不改型別): 首行為[exeNotReady]與處置, 次行為錯誤碼與說明
+//訊息不帶路徑、sha256、網址與大小(輸入參數之檢測機制V20): 離線缺檔(E_OFFLINE_MISSING)時次行只含缺哪些檔之檔名與固定說明(離線準備請呼叫ensureBins()並讀err.missing[]取得放置位置), 其餘錯誤碼沿用ensureBins之說明(固定詞彙, 不含值)
+function strExeNotReady(what, err) {
+    let code = get(err, 'code', 'E_ENSURE_BINS')
+    let head = `[exeNotReady] can not prepare ${what}, check the network, or see the README (external executables) for W_BIN_CACHE, W_BIN_MIRROR and W_BIN_OFFLINE`
+    if (code === 'E_OFFLINE_MISSING') {
+        let names = []
+        each(get(err, 'missing', []), (v) => {
+            let nm = get(v, 'name', '')
+            if (isestr(nm)) {
+                names.push(nm)
+            }
+        })
+        return `${head}\n${code} offline: ${names.length > 0 ? names.join(', ') : 'the file(s)'} not in the cache or the mirror; to prepare offline, call ensureBins() (of this package for yt-dlp.exe, of w-ffmpeg for ffmpeg.exe) and read err.missing[] for where to put the file(s)`
+    }
+    return `${head}\n${code} ${get(err, 'message', String(err))}`
+}
+
+
 function mkIdWork() {
     return `${now2strp()}-${genID(6)}`
 }
@@ -196,7 +215,7 @@ async function WDwloadDlp(url, fp, opt = {}) {
         fpExeFfmpeg = binsFfmpeg[fnExeFfmpeg]
     }
     catch (err) {
-        errTemp = `[exeNotReady] can not prepare yt-dlp.exe or ffmpeg.exe, check the network, or see the README (external executables) for W_BIN_CACHE, W_BIN_MIRROR and W_BIN_OFFLINE\n${get(err, 'code', 'E_ENSURE_BINS')} ${get(err, 'message', String(err))}`
+        errTemp = strExeNotReady('yt-dlp.exe or ffmpeg.exe', err)
         return Promise.reject(errTemp)
     }
     // console.log('fpExeDlp', fpExeDlp)
@@ -635,7 +654,7 @@ async function dwloadSubtitle(url, opt = {}) {
         fpExeDlp = binsDlp[fnExeDlp]
     }
     catch (err) {
-        return Promise.reject(`[exeNotReady] can not prepare yt-dlp.exe, check the network, or see the README (external executables) for W_BIN_CACHE, W_BIN_MIRROR and W_BIN_OFFLINE\n${get(err, 'code', 'E_ENSURE_BINS')} ${get(err, 'message', String(err))}`)
+        return Promise.reject(strExeNotReady('yt-dlp.exe', err))
     }
 
     return runInWork((fdWork) => {
