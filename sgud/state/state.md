@@ -2,7 +2,7 @@
 
 ## 外部執行檔(2026-10-29 起依制式規格,主幹模式)
 
-規格:`C:\opensrcOper\dspec\外部執行檔之存放下載校驗與離線.md`;本套件為 A 類、主幹模式(主控帳本 G10 登記).規則見 `sgud/rule/rulebook.md` R1~R3.
+規格:`C:\opensrcOper\dspec\外部執行檔之存放下載校驗與離線.md`;本套件為 A 類、主幹模式(主控帳本 G10 登記).規則見 `sgud/rule/rulebook.md` R1~R3(測試取得外部資源見 R6).
 
 | 項目 | 現況 |
 |---|---|
@@ -14,7 +14,7 @@
 | 取得順序 | 快取(`bin-cache/<sha256>/yt-dlp.exe` 或 `W_BIN_CACHE`)→ 鏡像(`W_BIN_MIRROR`)→ GitHub master(`https://raw.githubusercontent.com/yuda-lyu/w-dwload-dlp/master/bin/yt-dlp.exe`);連網呼叫先取 master 之 `bin/manifest.json`(取不到/無效 → 基準清單),離線不取主幹清單;任何來源皆以清單校驗 |
 | 忽略規則 | `.npmignore`(2026-11-02 依 dspec〈自有套件之npm發布範圍〉原則 3 重排):首段完整抄錄 `.gitignore`(含 `test/_tmp`、`/bin-cache/`),其後只有第 1 條排除項 `/bin/*`、`!/bin/manifest.json`;`sgud/`、`docs/`、`test/`、`toolg/` 隨包(`npm pack --dry-run` 75 檔,其中 `sgud/` 3 檔);`.gitignore`:`/bin-cache/`;`.gitattributes`:`bin/** binary` |
 | rollup UMD | `toolg/gDistRollup.mjs` external／globals 含 `os`、`url`、`crypto`、`stream`、`stream/promises`、`w-ffmpeg`(2026-10-29 暫存夾實建一次,`dist` 內無 `import.meta`,`require("w-ffmpeg")`,`ensureBins` 靜態屬性可用,套件根為 `dist/` 之上一層) |
-| 相依 | `wsemi` ^1.9.27、`w-ffmpeg` ^1.0.29;無 `postinstall` |
+| 相依 | `package.json`:`wsemi` ^1.9.75(2026-11-25 起;1.9.75 之 `fsEnsureBins` 具跨程序鎖,測試端取 `ffmpeg.exe` 依賴之,見 R6)、`w-ffmpeg` ^1.0.60;無 `postinstall`;`unit-binManifest` 之相依下限斷言仍為 wsemi 1.9.27、w-ffmpeg 1.0.29(首個含 `fsEnsureBins` 之版本),`unit-ffmpegBins` 另斷言 wsemi ≥ 1.9.75 |
 | 已移除 | `src/autoDownloadFiles.mjs`、`downloadFiles.mjs`、`ensureDlpExe.mjs`、`parseDlpManifest.mjs`、`scripts/install.mjs`、`toolg/genManifest.mjs`、`yt-dlp/` 目錄、`test/tools/dlpServer.mjs` 及其三支測試(`unit-downloadFiles`、`unit-ensureDlpExe`、`unit-dlpManifest`;下載核心之測試已在 wsemi) |
 
 ## 下載字幕與 url 隔開(2026-11-04,wd72,Gitea #72;規則 R4、R5)
@@ -34,16 +34,20 @@
 | `test/unit-subtitle.test.mjs` | R4:`pickSubTrack`(手動優先、langs 順序、大小寫、前綴邊界、機器翻譯、原文軌、json3 限定、代碼格式篩選、任意形狀 info 回 null)、`parseSubJson3`(時戳邊界、空白合併、缺漏/非預期項目、損壞/截斷、不去重、不重排)、匯出 |
 | `test/api-dwloadSubtitle.test.mjs`、`test/tools/fakeDlpSub.mjs` | R4:假 yt-dlp 起真子行程、不連網:欄位、引數(兩次呼叫共用工作夾、`--`、`--playlist-items 1`)、dash 開頭 url、不取 ffmpeg 不連網、自動軌與 translated、langs(陣列/字串/大小寫/空白)、opt 檢測(K3/V9/V11/debug 警告一次不回顯)、noSubtitle(無字幕/僅 vtt/僅 live_chat)、playlist/multi_video、yt-dlp 失敗分類(含 429 不重試)、outputNotFound(含靜默改下載 vtt)、invalidOutput(含檔案讀不到)、工作夾於成功與各失敗路徑皆刪、併行、殘留 25h 刪/23h 留、重複行保留、奇異 event、url 檢測(非字串/空白/包裝字串/空字元)、exeNotReady、osNotSupported |
 | `test/api-optionInjection.test.mjs` | R5:真 yt-dlp.exe(本機鏡像)、不連外網:`--version`、`--help` 於兩入口皆回 `[dlpFailed]`…`is not a valid URL` |
-| `test/dw_subtitle.test.mjs` | R4:真 YouTube/jsdelivr 功能測試:預期值由 oracle 導出;限流(`[httpError]`＋`HTTP Error 429`)標 pending;手動軌、短網址與帶 list 參數、原文自動軌、機器翻譯軌、m3u8 noSubtitle、頻道頁 invalidUrl、不存在影片 unavailable、本次工作夾已刪 |
+| `test/dw_subtitle.test.mjs` | R4:真 YouTube 功能測試(**需外網**,R6):預期值由 oracle 導出;限流(`[httpError]`＋`HTTP Error 429`)標 pending;手動軌、短網址與帶 list 參數、原文自動軌、機器翻譯軌、頻道頁 invalidUrl、不存在影片 unavailable、本次工作夾已刪;m3u8 noSubtitle 案之樣本改由本機服務供應(不連 jsDelivr,R6) |
 | `test/unit-binManifest.test.mjs` | 清單形態、與 `bin/` 實檔一致、版本與 `yt-dlp.exe --version` 一致、清單即 `genBinManifest` 所產、README 節、`.gitignore`／`.gitattributes`、T1(含誘餌檔之 `npm pack`:①不得入包只列外部執行檔與壓縮檔、`bin/` 除清單外、`CLAUDE*.md`、`tmp/`、`test/_tmp/`、`.env`;②`sgud/` 與 `test/tools/` 隨包;2026-11-02 依 dspec 原則 2〈套件測試之 npm 包檢查〉)、src 無自寫下載、無 postinstall、相依版本、rollup external、主檔匯出形態 |
 | `test/api-ensureBins.test.mjs` | T3~T8(本機 HTTP 伺服器扮 `raw.githubusercontent.com`、本地資料夾扮鏡像與快取,不連外網)、環境變數、套件根與 cwd 無關(子行程 `test/tools/ensureBinsChild.mjs`)、不轉傳 `floatingManifestUrl`;主函數類入口(攔截全域 `fetch`、攔截 `child_process.spawn` 改跑假 yt-dlp `test/tools/fakeDlp.mjs`、以假檔取代 `WFfmpeg.ensureBins`) |
 | `test/api-workFolder.test.mjs` | 規則 R3(假 yt-dlp 起真子行程、`TEMP`/`TMP` 導向 `test/_tmp/workFolder/tmp`,不連外網):兩併行呼叫之工作夾互不相同且先結束者不動後結束者下載中之檔、yt-dlp 失敗／無輸出檔／複製失敗皆刪夾、早退(`invalidUrl`／`exeNotReady`)不建夾、殘留夾 25h 刪／23h 留／命名不符與同名檔案不動、`clean` 無作用、刪除失敗忽略並由之後呼叫清、被占用(EBUSY)重試 |
 | `test/unit-workFolder.test.mjs` | src 無 `clean`／`Downloads`／`fsCleanFolder`、24 小時常數單一、README 與功能測試不含 `clean` 選項 |
 | `test/tools/fakeRun.mjs`、`test/tools/fakeDlp.mjs` | 主函數類測試共用夾具:攔截全域 `fetch` 與 `child_process.spawn`、假 `WFfmpeg.ensureBins`;假 yt-dlp 依 url(須為 `--` 之後唯一引數,否則離開碼 2)末段分 `fail`／`nofile`／正常,`FAKE_DLP_GATE` 為閘門令併行呼叫確定同時在跑;引數含 `--write-info-json`／`--load-info-json` 者交 `fakeDlpSub.mjs` |
 | `test/unit-parseDlpError.test.mjs` | yt-dlp 錯誤分類(未動) |
-| `test/dw_mp4.test.mjs`、`test/dw_m3u8.test.mjs` | 功能測試,實際連 YouTube／jsdelivr 下載;`yt-dlp.exe` 以本機鏡像供檔(`test/tools/dwMirror.mjs`),`ffmpeg.exe` 由 w-ffmpeg 自行取得(連 GitHub) |
+| `test/dw_mp4.test.mjs`、`test/dw_m3u8.test.mjs` | 功能測試(R6,2026-11-25 tdlp632 改):`yt-dlp.exe` 以本機鏡像供檔(`test/tools/dwMirror.mjs`);`ffmpeg.exe` 於 `before` 經共用取得點 `ensureFfmpeg()`(`test/tools/ffmpegBins.mjs`)取得,`this.timeout(FFMPEG_BUDGET_MS)`(約 33 分)對齊下載預算,跨程序只下載一次(wsemi 1.9.75 之鎖);`dw_mp4` 仍下載 YouTube 真實影片(**需外網**,網路不穩會紅,刻意不略過);`dw_m3u8` 之 m3u8 樣本由本機 HTTP 服務供應(`test/tools/sampleServer.mjs`,樣本 `test/fixtures/hls/`),且測試期間 `yt-dlp.exe` 之對外請求一律經不通之代理(只截斷 `yt-dlp.exe`,Node 自身之 `fetch` 不受影響) |
+| `test/unit-ffmpegBins.test.mjs` | R6:預算與 `w-ffmpeg` 清單之分片數對照、`totalMs` 與鎖等候上限、wsemi 1.9.75 單一提升之副本且取深層入口 `w-ffmpeg/src/ensureBins.mjs`、取得點行為(共用同一次取得、失敗不記住、傳 `names`／`totalMs`／`onTrace`)、`W_DLP_TEST_TRACE` 事件紀錄(白名單欄位)與 `test/tools/ffmpegTrace.mjs` 彙總 |
+| `test/api-sampleServer.test.mjs` | R6:本機樣本服務(只綁 127.0.0.1、播放清單與分段逐位元同 w-demores 原檔〔sha256 釘住〕、Range、404／405 並記錄、關閉釋放埠)與 `isolateExternal()`(對外請求經不通之代理、還原原值) |
+| `test/unit-testNetworkGuard.test.mjs` | R6:靜態接線掃描——真跑主函數之檔恰 2 個且 `before` 依序「`this.timeout(FFMPEG_BUDGET_MS)` → `ensureFfmpeg()` → `setupMirror`」、`it` 內不取、不直引 `w-ffmpeg`;測試與工具不含 CDN 網域;樣本消費者用本機服務與 `isolateExternal`;YouTube 案保留並於 README／rulebook 註明需外網 |
 
-最近一次驗證(2026-11-04,wd72 輪):全套 `npm test`(`quiet-run --lock`)**139 passing、1 pending、0 failing**(修前基準 76 passing;pending 為 `dw_subtitle` 機器翻譯軌遇 YouTube 429,屬外部限流);新測試修前紅(新入口 25＋選項注入 2＋經嚴格假 yt-dlp 之主函數類 9 案紅、`unit-subtitle` 載入失敗);變異 71 項(挑軌 18、解析 13、子行程引數與流程 33、工作夾 4、主函數 `--` 3)首輪 70 被抓、1 存活(`opt` 被改寫之斷言不足)→補斷言後 71/71;eslint `src`／`test` 0 error;UMD 於暫存夾實建(`dwloadSubtitle` 為函數、`dist` 無 `import.meta`、與 src 實跑結果逐欄相同);報告 `C:\opensrcOper\dnow\20261104203926\agent-out\wd72-修正報告.md`.
+最近一次驗證(2026-11-25,tdlp632 輪;排程第 632 項,只改測試端,產品 0 行改動):清空 `node_modules/w-ffmpeg/bin-cache` 後以 `W_DLP_TEST_TRACE` 記事件跑全套 `npm test`(`quiet-run --lock`,平行)**164 passing、1 pending、0 failing**(pending 為 `dw_subtitle` 機器翻譯軌遇 YouTube 429,屬外部限流),`test/tools/ffmpegTrace.mjs` 彙總:5 個分片各下載 1 次(單一程序),另一程序 `lock-wait` 後命中快取;單檔 `dw_m3u8`、`dw_mp4` 各於清空快取下單獨執行皆綠、各下載 1 次;發布包解開之目錄(另一配置,自 `npm pack` 之 tgz 解開並裝相依、補 `bin/yt-dlp.exe`)全套 162 passing、1 pending、2 failing——2 failing 皆為 `unit-binManifest` 內需 `.gitignore`／`.npmignore` 之 `npm pack` 內容案(發布包不含該二檔,此配置必敗;repo 內二案綠);修前紅:`dw_m3u8` 舊版於清空快取、`--timeout 5000` 逾時而新版綠、jsDelivr 樣本斷網(代理不通)時舊版 2 案紅、兩程序同時取空快取時公開入口每分片下載 2 次而深層入口 1 次;新測試之變異 41 項全被抓(1 項為等價變異不計);eslint `--ext .mjs src test` 0 問題;private-guard CLEAN;證據副本 `C:\opensrcOper\dnow\20261124223109\agent-out\tdlp632-evidence\`.
+先前驗證(2026-11-04,wd72 輪):全套 `npm test`(`quiet-run --lock`)**139 passing、1 pending、0 failing**(修前基準 76 passing;pending 為 `dw_subtitle` 機器翻譯軌遇 YouTube 429,屬外部限流);新測試修前紅(新入口 25＋選項注入 2＋經嚴格假 yt-dlp 之主函數類 9 案紅、`unit-subtitle` 載入失敗);變異 71 項(挑軌 18、解析 13、子行程引數與流程 33、工作夾 4、主函數 `--` 3)首輪 70 被抓、1 存活(`opt` 被改寫之斷言不足)→補斷言後 71/71;eslint `src`／`test` 0 error;UMD 於暫存夾實建(`dwloadSubtitle` 為函數、`dist` 無 `import.meta`、與 src 實跑結果逐欄相同);報告 `C:\opensrcOper\dnow\20261104203926\agent-out\wd72-修正報告.md`.
 先前驗證(2026-11-02,pk-dwload-dlp 輪):全套 `npm test` **76 passing、0 failing**(修前 74 passing、1 failing——`sgud/` 不得入包之舊斷言紅;`unit-binManifest` 內 npm 包檢查一案拆為兩案);npm 包檢查變異 6 項(`src/`／`dist/` 放假 `.exe`／`.dll`／`.tgz`、`.npmignore` 排除 `sgud`、排除 `test/tools`、拿掉 `/bin/*`、拿掉 `CLAUDE*.md`、拿掉 `test/_tmp`)全被抓.
 先前驗證(2026-10-29,bin-dlp2 輪):全套 `npm test`(`mocha --parallel`)**75 passing、0 failing**,同一次測試鎖內連跑 3 次皆綠(每次約 14 秒;`dw_mp4`、`dw_m3u8` 併行實際下載皆成功);舊碼(bin-dlp 輪之共用 `Downloads` 夾加 `clean`)配最終版測試 11 案紅;工作夾變異 20 項:19 被抓、1 存活(m06 為等價變異——`fsDeleteFolder` 自身拒刪非資料夾,以 m19 直接 `rmSync` 之變異證實「命名相符之檔案不刪」之斷言有效);L0 lint 0 error、UMD 於暫存夾實建可載入且 `ensureBins` 靜態屬性在.
 bin-dlp 輪(2026-10-29)之結果:舊碼(HEAD)配新測試 14 案紅、變異 28 項全被抓;`node C:/opensrcOper/tools/scan-bins.mjs --only w-dwload-dlp` 為 OK;`npm pack --dry-run` 之 `bin/` 只有 `manifest.json`(該部分本輪未動).

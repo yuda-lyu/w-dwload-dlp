@@ -2,6 +2,7 @@ import fs from 'fs'
 import assert from 'assert'
 import WDwloadDlp from '../src/WDwloadDlp.mjs'
 import { setupMirror } from './tools/dwMirror.mjs'
+import { ensureFfmpeg, FFMPEG_BUDGET_MS } from './tools/ffmpegBins.mjs'
 
 
 function isWindows() {
@@ -16,13 +17,18 @@ describe('WDwloadDlp mp4', function() {
         return
     }
 
-    //yt-dlp.exe以本機鏡像供檔(經清單校驗), ffmpeg.exe由w-ffmpeg取得
+    //yt-dlp.exe以本機鏡像供檔(經清單校驗); ffmpeg.exe經共用取得點ensureFfmpeg取得(時限對齊下載預算, 跨程序只下載一次, R6)
+    //本檔為本套件核心功能之整合測試: 下載YouTube真實影片, 須外網, 網路不穩或YouTube限制時會紅(見README〈測試之網路需求〉與rulebook R6), 不改為預設略過
     let m = null
-    before(function() {
+    before(async function() {
+        this.timeout(FFMPEG_BUDGET_MS)
+        await ensureFfmpeg()
         m = setupMirror('dwMp4')
     })
     after(function() {
-        m.restore()
+        if (m) {
+            m.restore()
+        }
     })
 
     async function test() {

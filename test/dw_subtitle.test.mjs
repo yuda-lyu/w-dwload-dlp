@@ -5,9 +5,10 @@ import assert from 'assert'
 import { spawnSync } from 'child_process'
 import WDwloadDlp from '../src/WDwloadDlp.mjs'
 import { setupMirror } from './tools/dwMirror.mjs'
+import { startSampleServer, isolateExternal } from './tools/sampleServer.mjs'
 
 
-//功能測試: 實際連YouTube/jsdelivr, yt-dlp.exe以本機鏡像供檔(同dw_*.test.mjs)
+//功能測試: 實際連YouTube(須外網, 網路不穩或YouTube限制時會紅, 見README〈測試之網路需求〉與rulebook R6), yt-dlp.exe以本機鏡像供檔(同dw_*.test.mjs); 無字幕之樣本(m3u8)由本機HTTP服務供應, 不連jsDelivr
 //規格: 同test/api-dwloadSubtitle.test.mjs(sgud/rule/rulebook.md R4); 本檔只驗真實網站上之行為, 錯誤分類與工作夾等細節由假yt-dlp之api測試驗證
 //
 //外部資料之處理(字幕由上傳者與YouTube提供, 可能變動):
@@ -28,6 +29,7 @@ describe(`dwloadSubtitle (real network)`, function() {
     let envBak = {}
     let fpExe = ''
     let factsCache = new Map()
+    let srv = null
 
     before(async function() {
         fs.rmSync(fdt, { recursive: true, force: true })
@@ -40,8 +42,12 @@ describe(`dwloadSubtitle (real network)`, function() {
         assert.strict.equal(path.resolve(os.tmpdir()).toLowerCase(), path.resolve(fdt).toLowerCase())
         let bins = await WDwloadDlp.ensureBins({ names: 'yt-dlp.exe' })
         fpExe = bins['yt-dlp.exe']
+        srv = await startSampleServer() //置於環境變數記錄之後, 其失敗時after仍能還原TEMP/TMP
     })
-    after(function() {
+    after(async function() {
+        if (srv) {
+            await srv.close()
+        }
         for (let k of ['TEMP', 'TMP']) {
             if (envBak[k] === undefined) {
                 delete process.env[k]
@@ -180,10 +186,18 @@ describe(`dwloadSubtitle (real network)`, function() {
     })
 
     it(`should reject [noSubtitle] for a stream without subtitles`, async function() {
-        //規格: 無可用字幕軌reject noSubtitle
-        let err = await WDwloadDlp.dwloadSubtitle('https://cdn.jsdelivr.net/npm/w-demores/res/video/aigen_hls/playlist.m3u8')
-            .then(() => 'resolved', (e) => e)
+        //規格: 無可用字幕軌reject noSubtitle; 樣本為本機HTTP服務供應之m3u8(w-demores之aigen_hls), 且yt-dlp.exe之對外請求一律經不通之代理, 故結果不受外網影響
+        let restoreEnv = isolateExternal()
+        let err = null
+        try {
+            err = await WDwloadDlp.dwloadSubtitle(srv.urls.m3u8)
+                .then(() => 'resolved', (e) => e)
+        }
+        finally {
+            restoreEnv()
+        }
         assert.strict.equal(err.split('\n')[0].startsWith('[noSubtitle] '), true, err)
+        assert.strict.equal(srv.requests.some((v) => v.url === '/hls/playlist.m3u8' && v.status === 200), true) //樣本確實取自本機服務
         assert.strict.equal(workLeft().length, 0)
     })
 

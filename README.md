@@ -142,6 +142,16 @@ catch (err) {
 - 行程崩潰或被強制結束時工作夾會殘留:每次呼叫開始時,自動刪除 `w-dwload-dlp/` 下修改時間逾 24 小時之工作夾(只認上述命名之資料夾,其他東西不動;刪除失敗則忽略,不影響本次呼叫).已知限制:單一呼叫若持續超過 24 小時(例如錄製直播),其工作夾在他呼叫開始時會被視為殘留而嘗試刪除,本套件不支援此用法.
 - 維護者更新 `yt-dlp.exe` 見 [yt-dlp.md](yt-dlp.md).
 
+## 測試之網路需求
+
+`npm test`(`mocha --parallel`)之網路需求如下,其餘測試(假 yt-dlp、本機伺服器、本機鏡像)皆不連外網:
+
+| 測試 | 需要 | 說明 |
+|---|---|---|
+| `dw_mp4`、`dw_m3u8` | `ffmpeg.exe`(約 122 MB) | 真跑 `WDwloadDlp` 需要真 `ffmpeg.exe`.一律經共用取得點 `test/tools/ffmpegBins.mjs`(`ensureFfmpeg()`)於 `before` 取得,時限對齊下載預算(約 33 分,不沿用全域 180 秒).快取在 `node_modules/w-ffmpeg/bin-cache`,`w-ffmpeg` 升版即清空,故升版後之首次跟跑會重新下載.平行執行時由 `wsemi`(1.9.75 起)之 `fsEnsureBins` 跨程序鎖保證只下載一次(一個程序下載,其餘等候後讀快取).`W_DLP_TEST_TRACE=<檔案>` 時逐行記錄取得事件,`node test/tools/ffmpegTrace.mjs <檔案>` 彙總各分片之下載次數與等候鎖之程序 |
+| `dw_m3u8`、`dw_subtitle`(`[noSubtitle]` 案) | 樣本無需外網 | m3u8 樣本(`w-demores` 之 `aigen_hls`)由本機 HTTP 服務(`test/tools/sampleServer.mjs`,只綁 `127.0.0.1`,樣本分段在 `test/fixtures/hls/`)供應,不連 CDN;測試期間 `yt-dlp.exe` 之對外請求一律經不通之代理(只有 `127.0.0.1` 直連),與網路是否暢通無關.限制:該代理只截斷 `yt-dlp.exe`;Node 自身之 `fetch` 不受影響,故 `WDwloadDlp` 仍會取 GitHub 主幹清單(取不到時退回基準清單),`dw_m3u8` 之 `ffmpeg.exe` 取得見上一列 |
+| `dw_mp4`、`dw_subtitle`(YouTube 之 6 案:手動軌、短網址與 `list` 參數、原文自動軌、機器翻譯、頻道頁、不存在之影片) | **外網**(YouTube) | 本套件核心功能之整合測試,下載 YouTube 真實影片與字幕,**須外網;網路不穩、YouTube 限流或影片變動時會紅**(字幕之 `HTTP Error 429` 限流標 pending),不改為預設略過 |
+
 ## Breaking changes
 (依自有套件原則:不保留舊版相容層,下游連帶修正)
 

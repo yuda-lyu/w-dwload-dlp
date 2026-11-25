@@ -2,6 +2,14 @@
 
 本檔為執行工作時特有之累積經驗,留給後續之嘗試、執行與判斷,由agent自行編列、擴充與維護.過長時抽出舊者為`experience_<年月日>.md`,並於本檔註明何時抽出.
 
+## 測試取得 ffmpeg.exe 與樣本(2026-11-25,tdlp632,排程第 632 項;規則 R6)
+
+- **`w-ffmpeg` 之公開 UMD 入口與頂層 wsemi 無關**:`w-ffmpeg` 1.0.60 之 `dist/w-ffmpeg.umd.js` 把 wsemi 打包進去(發布時之版本,無鎖),頂層 `node_modules/wsemi` 升到 1.9.75 對 `WFfmpeg.ensureBins` 與 `WDwloadDlp` 內部之取得**皆無作用**(`npm ls` 顯示 deduped 1.9.75 會讓人誤以為已套);深層入口 `w-ffmpeg/src/ensureBins.mjs` 才經頂層 wsemi(有鎖).實測兩程序同時對空快取取得:公開入口每分片取 2 次(共 10 次、約 27 秒、無等候),深層入口每分片 1 次(共 5 次、另一程序 `lock-wait`、約 10 秒).故測試之共用取得點用深層入口;`w-ffmpeg` 發布內嵌 wsemi 1.9.75 以上之 dist 後可改回公開入口.檢查法:`grep -c "E_LOCK_TIMEOUT" node_modules/w-ffmpeg/dist/*.umd.js`(0＝無鎖).
+- **取得處之時限須自算**:wsemi 鎖等候上限＝下載次數(分片數)×`totalMs`＋解壓批數×(`totalMs`＋5 秒)＋寬裕 `min(totalMs, 60 秒)`;`totalMs` 預設 600000 時約 61 分,收緊為 300000 後約 31 分,`before` 時限再加 120 秒＝約 33 分(`FFMPEG_BUDGET_MS`).分片數寫在 `test/tools/ffmpegBins.mjs`(`FFMPEG_PARTS`),由 `unit-ffmpegBins` 對 `w-ffmpeg` 清單守住.
+- **驗收之確定性替身**:本機網路快(122 MB 約 10~80 秒)時,舊版不會真的撞上 180 秒;以 `--timeout 5000` 配清空 `node_modules/w-ffmpeg/bin-cache` 可確定性重現逾時型紅(舊:`it` 內隱式取得 → `Timeout of 5000ms exceeded`,且下載於逾時後才完成,與事故同形;新:取得點之 `before` 自給時限 → 綠).
+- **模擬外網斷線之法**:`HTTP_PROXY`／`HTTPS_PROXY` 指向不通之埠、`NO_PROXY=127.0.0.1,localhost`:yt-dlp(Python)遵守,Node 之 `fetch` 預設不遵守(故不影響 ffmpeg 之下載);`test/tools/sampleServer.mjs` 之 `isolateExternal()` 即此法,消費樣本之案據此與網路是否暢通無關.
+- **樣本檔與 git 換行**:播放清單(146 位元組文字)若存檔,autocrlf 環境下檢出會變 CRLF 而雜湊改變,故以常數內建於服務(LF);二進位分段 `segment_000.ts` 存於 `test/fixtures/hls/`(依 dspec 測試隨包,312 KB,遠小於 10 MB 門檻).
+
 ## 字幕入口與選項注入(2026-11-04,wd72,Gitea #72)
 
 - **yt-dlp 2026.10.26 字幕行為(皆實測)**:①字幕軌無 json3 時 `--sub-format json3` **不報錯**,印 `WARNING: No subtitle format found matching "json3" for language zh-Hant, using vtt` 後改下載 `dl.zh-Hant.vtt`,離開碼 0(`jfXg5ZslKg4` 之自動軌 `zh-Hant`〔僅 vtt〕;同片另有手動 `zh-Hant`〔有 json3〕);②自動軌第 1 筆格式常為無 `name` 之 vtt(`TXcnAHNA0RU` 之 `zh-Hans`:`[{ext:vtt},{ext:json3,name:…},…]`),`name` 要取 json3 該筆;③純自動字幕影片(`9bZkp7q19f0`)157 軌皆有 json3,第 1 筆為 `ab`(Abkhazian,機器翻譯),原文軌為 `ko-orig`;④`live_chat`(ext `json`)出現在**直播中**之影片(`mhJRzQsLZGg` 之 `--list-subs` 為 `live_chat json`),曾直播之回放(`was_live`,試 5 部)之 info.json 無此鍵——有則因無 json3 被排除;⑤有 CC 字幕之直播回放,自動軌名稱為 `<語言>-<手動軌代碼>`(如 `ab-en-uYU-mmqFLq8`),手動軌代碼本身為 `en-uYU-mmqFLq8`(非標準 BCP47),沒有 `-orig`.
