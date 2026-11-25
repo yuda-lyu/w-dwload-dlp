@@ -148,7 +148,7 @@ catch (err) {
 
 | 測試 | 需要 | 說明 |
 |---|---|---|
-| `dw_mp4`、`dw_m3u8` | `ffmpeg.exe`(約 122 MB) | 真跑 `WDwloadDlp` 需要真 `ffmpeg.exe`.一律經共用取得點 `test/tools/ffmpegBins.mjs`(`ensureFfmpeg()`)於 `before` 取得,時限對齊下載預算(約 33 分,不沿用全域 180 秒).快取在 `node_modules/w-ffmpeg/bin-cache`,`w-ffmpeg` 升版即清空,故升版後之首次跟跑會重新下載.平行執行時由 `wsemi`(1.9.75 起)之 `fsEnsureBins` 跨程序鎖保證只下載一次(一個程序下載,其餘等候後讀快取).`W_DLP_TEST_TRACE=<檔案>` 時逐行記錄取得事件,`node test/tools/ffmpegTrace.mjs <檔案>` 彙總各分片之下載次數與等候鎖之程序 |
+| `dw_mp4`、`dw_m3u8` | `ffmpeg.exe`(約 122 MB) | 真跑 `WDwloadDlp` 需要真 `ffmpeg.exe`.一律經共用取得點 `test/tools/ffmpegBins.mjs`(`ensureFfmpeg()`)於 `before` 取得,時限依 `wsemi`(1.9.76 起)之 `fsEnsureBinsBudget` 依 `w-ffmpeg` 之清單求得(鎖等候上限約 61 分;並行時最壞要先等他方、他方失敗才自行取得,故 `before` 取兩倍約 122 分;不沿用全域 180 秒,每檔下載上限取 `fsEnsureBins` 之預設).快取在 `node_modules/w-ffmpeg/bin-cache`,`w-ffmpeg` 升版即清空,故升版後之首次跟跑會重新下載.取得走 `w-ffmpeg`(1.0.61 起)之公開入口 `WFfmpeg.ensureBins`,平行執行時由 `wsemi`(1.9.75 起)之 `fsEnsureBins` 跨程序鎖保證只下載一次(一個程序下載,其餘等候後讀快取).`W_DLP_TEST_TRACE=<檔案>` 時逐行記錄取得事件,`node test/tools/ffmpegTrace.mjs <檔案>` 彙總各分片之下載次數與等候鎖之程序 |
 | `dw_m3u8`、`dw_subtitle`(`[noSubtitle]` 案) | 樣本無需外網 | m3u8 樣本(`w-demores` 之 `aigen_hls`)由本機 HTTP 服務(`test/tools/sampleServer.mjs`,只綁 `127.0.0.1`,樣本分段在 `test/fixtures/hls/`)供應,不連 CDN;測試期間 `yt-dlp.exe` 之對外請求一律經不通之代理(只有 `127.0.0.1` 直連),與網路是否暢通無關.限制:該代理只截斷 `yt-dlp.exe`;Node 自身之 `fetch` 不受影響,故 `WDwloadDlp` 仍會取 GitHub 主幹清單(取不到時退回基準清單),`dw_m3u8` 之 `ffmpeg.exe` 取得見上一列 |
 | `dw_mp4`、`dw_subtitle`(YouTube 之 6 案:手動軌、短網址與 `list` 參數、原文自動軌、機器翻譯、頻道頁、不存在之影片) | **外網**(YouTube) | 本套件核心功能之整合測試,下載 YouTube 真實影片與字幕,**須外網;網路不穩、YouTube 限流或影片變動時會紅**(字幕之 `HTTP Error 429` 限流標 pending),不改為預設略過 |
 
